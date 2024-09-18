@@ -3,21 +3,23 @@ package censor
 import (
 	"regexp"
 	"strings"
+
+	"github.com/capcom6/censor-tg-bot/internal/config"
 )
 
 var filter = regexp.MustCompile(`[^\p{Cyrillic}\p{Latin}][:graph:]`)
 
-type censor struct {
+type Censor struct {
 	blacklist []string
 }
 
-func New(config Config) *censor {
-	return &censor{
+func New(config config.Censor) *Censor {
+	return &Censor{
 		blacklist: config.Blacklist,
 	}
 }
 
-func (c *censor) IsAllow(text string) (bool, error) {
+func (c *Censor) IsAllow(text string) (bool, error) {
 	text = filter.ReplaceAllString(text, "")
 	text = strings.ToLower(text)
 	for _, word := range c.blacklist {
