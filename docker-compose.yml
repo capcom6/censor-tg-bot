@@ -6,4 +6,6 @@ services:
     environment:
       - TELEGRAM__TOKEN=${TELEGRAM__TOKEN}
       - TELEGRAM__ADMIN_ID=${TELEGRAM__ADMIN_ID}
+      - CENSOR__BLACKLIST=${CENSOR__BLACKLIST}
     restart: unless-stopped
+    stop_signal: SIGINT
