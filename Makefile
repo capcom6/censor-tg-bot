@@ -1,6 +1,7 @@
 # Go parameters
 GOCMD=go
 AIRCMD=air
+GORUN=$(GOCMD) run
 GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
@@ -23,10 +24,9 @@ clean:
 	rm -f $(BINARY_NAME)
 
 run:
-	$(GOBUILD) -o $(BINARY_NAME) -v ./...
-	./$(BINARY_NAME)
+	$(GORUN) .
 
 deps:
-	$(GOGET) github.com/go-telegram-bot-api/telegram-bot-api
+	$(GOCMD) mod download
 
 .PHONY: all air build test clean run deps
