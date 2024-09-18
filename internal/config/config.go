@@ -1,11 +1,13 @@
 package config
 
 import (
-	"log"
+	"errors"
+	"os"
 	"sync"
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
+	"go.uber.org/zap"
 )
 
 type Telegram struct {
@@ -33,10 +35,12 @@ var instance = Config{
 }
 var once = &sync.Once{}
 
-func Get() Config {
+func Get(logger *zap.Logger) Config {
 	once.Do(func() {
 		if err := godotenv.Load(); err != nil {
-			log.Printf("Error loading .env file: %s", err)
+			if !errors.Is(err, os.ErrNotExist) {
+				logger.Error("error loading .env file", zap.Error(err))
+			}
 		}
 		envconfig.MustProcess("", &instance)
 	})
