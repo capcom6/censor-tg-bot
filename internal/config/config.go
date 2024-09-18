@@ -13,11 +13,24 @@ type Telegram struct {
 	AdminID int64  `envconfig:"TELEGRAM__ADMIN_ID" required:"true"`
 }
 
-type Config struct {
-	Telegram Telegram
+type Censor struct {
+	Blacklist []string `envconfig:"CENSOR__BLACKLIST"`
 }
 
-var instance = Config{}
+type Config struct {
+	Telegram Telegram
+	Censor   Censor
+}
+
+var instance = Config{
+	Telegram: Telegram{},
+	Censor: Censor{
+		Blacklist: []string{
+			"$",
+			"долл",
+		},
+	},
+}
 var once = &sync.Once{}
 
 func Get() Config {

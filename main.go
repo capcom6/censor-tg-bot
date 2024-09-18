@@ -2,8 +2,8 @@ package main
 
 import (
 	"log"
-	"strings"
 
+	"github.com/capcom6/censor-tg-bot/internal/censor"
 	"github.com/capcom6/censor-tg-bot/internal/config"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -11,12 +11,15 @@ import (
 func main() {
 	cfg := config.Get()
 
+	censor := censor.New(censor.Config{
+		Blacklist: cfg.Censor.Blacklist,
+	})
 	bot, err := tgbotapi.NewBotAPI(cfg.Telegram.Token)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	bot.Debug = true
+	bot.Debug = false
 
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
@@ -26,31 +29,41 @@ func main() {
 	updates := bot.GetUpdatesChan(u)
 
 	for update := range updates {
-		if update.Message == nil {
+		if update.Message == nil && update.EditedMessage == nil {
 			continue
 		}
 
-		log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
+		message := update.Message
+		if message == nil {
+			message = update.EditedMessage
+		}
 
-		if !strings.Contains(update.Message.Text, "$") {
+		log.Printf("[%s] %s", message.From.UserName, message.Text)
+
+		ok, err := censor.IsAllow(message.Text)
+		if err != nil {
+			log.Printf("Error checking message: %s", err)
+			continue
+		}
+		if ok {
 			continue
 		}
 
-		deleteReq := tgbotapi.NewDeleteMessage(update.Message.Chat.ID, update.Message.MessageID)
+		deleteReq := tgbotapi.NewDeleteMessage(message.Chat.ID, message.MessageID)
 
-		if _, err := bot.Send(deleteReq); err != nil {
+		if _, err := bot.Request(deleteReq); err != nil {
 			log.Printf("Error deleting message: %s", err)
 		}
 
-		notifyReq := tgbotapi.NewMessage(cfg.Telegram.AdminID, "Removed message from @"+update.Message.From.UserName+"\n<pre>"+update.Message.Text+"</pre>")
+		notifyReq := tgbotapi.NewMessage(cfg.Telegram.AdminID, "Removed message from @"+message.From.UserName+"\n<pre>"+message.Text+"</pre>")
 		notifyReq.ParseMode = "HTML"
 
 		if _, err := bot.Send(notifyReq); err != nil {
 			log.Printf("Error sending message: %s", err)
 		}
 
-		// msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
-		// msg.ReplyToMessageID = update.Message.MessageID
+		// msg := tgbotapi.NewMessage(message.Chat.ID, message.Text)
+		// msg.ReplyToMessageID = message.MessageID
 
 		// if _, err := bot.Send(msg); err != nil {
 		// 	log.Printf("Error sending message: %s", err)
