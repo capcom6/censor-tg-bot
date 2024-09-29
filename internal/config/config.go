@@ -10,18 +10,28 @@ import (
 	"go.uber.org/zap"
 )
 
+type Bot struct {
+	AdminID      int64 `envconfig:"BOT__ADMIN_ID" required:"true"`
+	BanThreshold int   `envconfig:"BOT__BAN_THRESHOLD" default:"3"`
+}
+
 type Telegram struct {
-	Token   string `envconfig:"TELEGRAM__TOKEN" required:"true"`
-	AdminID int64  `envconfig:"TELEGRAM__ADMIN_ID" required:"true"`
+	Bot
+	Token string `envconfig:"TELEGRAM__TOKEN" required:"true"`
 }
 
 type Censor struct {
 	Blacklist []string `envconfig:"CENSOR__BLACKLIST"`
 }
 
+type Storage struct {
+	URL string `envconfig:"STORAGE__URL"`
+}
+
 type Config struct {
 	Telegram Telegram
 	Censor   Censor
+	Storage  Storage
 }
 
 var instance = Config{
@@ -31,6 +41,9 @@ var instance = Config{
 			"$",
 			"долл",
 		},
+	},
+	Storage: Storage{
+		URL: "memory://storage?ttl=5m",
 	},
 }
 var once = &sync.Once{}
