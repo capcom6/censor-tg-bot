@@ -11,4 +11,7 @@ var Module = fx.Module(
 	fx.Provide(func(cfg Config) Censor {
 		return cfg.Censor
 	}),
+	fx.Provide(func(cfg Config) Storage {
+		return cfg.Storage
+	}),
 )

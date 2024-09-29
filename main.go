@@ -6,6 +6,7 @@ import (
 	"github.com/capcom6/censor-tg-bot/internal/bot"
 	"github.com/capcom6/censor-tg-bot/internal/censor"
 	"github.com/capcom6/censor-tg-bot/internal/config"
+	"github.com/capcom6/censor-tg-bot/internal/storage"
 	"github.com/capcom6/go-infra-fx/logger"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -39,6 +40,7 @@ func main() {
 		logger.Module,
 		config.Module,
 		censor.Module,
+		storage.Module,
 		bot.Module,
 		module,
 	).Run()
