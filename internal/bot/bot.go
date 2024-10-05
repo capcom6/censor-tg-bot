@@ -7,6 +7,7 @@ import (
 	"github.com/capcom6/censor-tg-bot/internal/censor"
 	"github.com/capcom6/censor-tg-bot/internal/config"
 	"github.com/capcom6/censor-tg-bot/internal/storage"
+	"github.com/capcom6/censor-tg-bot/pkg/utils/slices"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -51,13 +52,9 @@ func (b *bot) Start() {
 	updates := b.api.GetUpdatesChan(u)
 	go func() {
 		for update := range updates {
-			if update.Message == nil && update.EditedMessage == nil {
-				continue
-			}
-
-			message := update.Message
+			message := slices.FirstNotZero(update.Message, update.EditedMessage, update.ChannelPost, update.EditedChannelPost)
 			if message == nil {
-				message = update.EditedMessage
+				continue
 			}
 
 			if err := b.processMessage(*message); err != nil {
