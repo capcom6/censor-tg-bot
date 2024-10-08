@@ -64,14 +64,30 @@ func (b *bot) Start() {
 	}()
 }
 
+func (b *bot) isAllowedMessage(message tgbotapi.Message) (bool, error) {
+	if message.From.ID == b.cfg.AdminID {
+		return true, nil
+	}
+
+	if ok, err := b.censor.IsAllow(message.Text); err != nil || !ok {
+		return ok, err
+	}
+
+	if ok, err := b.censor.IsAllow(message.Caption); err != nil || !ok {
+		return ok, err
+	}
+
+	return true, nil
+}
+
 func (b *bot) processMessage(message tgbotapi.Message) error {
 	if message.From.ID == b.cfg.AdminID {
 		return nil
 	}
 
-	ok, err := b.censor.IsAllow(message.Text)
+	ok, err := b.isAllowedMessage(message)
 	if err != nil {
-		return fmt.Errorf("censor error: %w", err)
+		return fmt.Errorf("error checking message: %w", err)
 	}
 	if ok {
 		return nil
