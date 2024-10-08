@@ -20,6 +20,10 @@ func New(config config.Censor) *Censor {
 }
 
 func (c *Censor) IsAllow(text string) (bool, error) {
+	if text == "" {
+		return true, nil
+	}
+
 	text = filter.ReplaceAllString(text, "")
 	text = strings.ToLower(text)
 	for _, word := range c.blacklist {
