@@ -13,10 +13,10 @@ type item struct {
 
 func (i *item) inc() int {
 	if time.Since(i.since) > i.ttl {
-		i.since = time.Now()
 		i.count = 0
 	}
 
+	i.since = time.Now()
 	i.count++
 
 	return i.count
