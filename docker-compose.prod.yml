@@ -2,10 +2,11 @@ services:
   bot:
     image: capcom6/censor-tg-bot:latest
     environment:
-      - TELEGRAM__TOKEN=${TELEGRAM__TOKEN}
       - BOT__ADMIN_ID=${TELEGRAM__ADMIN_ID}
       - BOT__BAN_THRESHOLD=3
+      - TELEGRAM__TOKEN=${TELEGRAM__TOKEN}
       - CENSOR__BLACKLIST=${CENSOR__BLACKLIST}
+      - STORAGE__URL=${STORAGE__URL}
     deploy:
       resources:
         limits:
