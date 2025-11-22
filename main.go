@@ -14,21 +14,21 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var module = fx.Module(
-	"main",
-	fx.Invoke(func(lc fx.Lifecycle) {
-		lc.Append(fx.Hook{
-			OnStart: func(ctx context.Context) error {
-				return nil
-			},
-			OnStop: func(ctx context.Context) error {
-				return nil
-			},
-		})
-
-		// log.Debug("config", zap.Any("config", cfg))
-	}),
-)
+func module() fx.Option {
+	return fx.Module(
+		"main",
+		fx.Invoke(func(lc fx.Lifecycle) {
+			lc.Append(fx.Hook{
+				OnStart: func(_ context.Context) error {
+					return nil
+				},
+				OnStop: func(_ context.Context) error {
+					return nil
+				},
+			})
+		}),
+	)
+}
 
 func main() {
 	fx.New(
@@ -38,10 +38,10 @@ func main() {
 			return &logOption
 		}),
 		logger.Module,
-		config.Module,
-		censor.Module,
-		storage.Module,
-		bot.Module,
-		module,
+		config.Module(),
+		censor.Module(),
+		storage.Module(),
+		bot.Module(),
+		module(),
 	).Run()
 }

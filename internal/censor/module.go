@@ -5,10 +5,12 @@ import (
 	"go.uber.org/zap"
 )
 
-var Module = fx.Module(
-	"censor",
-	fx.Decorate(func(logger *zap.Logger) *zap.Logger {
-		return logger.Named("censor")
-	}),
-	fx.Provide(New),
-)
+func Module() fx.Option {
+	return fx.Module(
+		"censor",
+		fx.Decorate(func(logger *zap.Logger) *zap.Logger {
+			return logger.Named("censor")
+		}),
+		fx.Provide(New),
+	)
+}

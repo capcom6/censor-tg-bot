@@ -64,9 +64,9 @@ func TestNew(t *testing.T) {
 }
 
 func TestStorage_GetOrSet(t *testing.T) {
-	s, err := storage.New(config.Storage{URL: "memory://storage?ttl=1h"})
-	if err != nil {
-		t.Fatalf("Failed to create storage: %v", err)
+	s, initErr := storage.New(config.Storage{URL: "memory://storage?ttl=1h"})
+	if initErr != nil {
+		t.Fatalf("Failed to create storage: %v", initErr)
 	}
 
 	t.Run("Set new key", func(t *testing.T) {
@@ -112,9 +112,9 @@ func TestStorage_GetOrSet(t *testing.T) {
 }
 
 func TestStorage_GetOrSet_Expiration(t *testing.T) {
-	s, err := storage.New(config.Storage{URL: "memory://storage?ttl=1ms"})
-	if err != nil {
-		t.Fatalf("Failed to create storage: %v", err)
+	s, initErr := storage.New(config.Storage{URL: "memory://storage?ttl=1ms"})
+	if initErr != nil {
+		t.Fatalf("Failed to create storage: %v", initErr)
 	}
 
 	t.Run("Expired key", func(t *testing.T) {
@@ -131,14 +131,14 @@ func TestStorage_GetOrSet_Expiration(t *testing.T) {
 }
 
 func BenchmarkStorage_GetOrSet(b *testing.B) {
-	s, err := storage.New(config.Storage{URL: "memory://storage?ttl=1h"})
-	if err != nil {
-		b.Fatalf("Failed to create storage: %v", err)
+	s, initErr := storage.New(config.Storage{URL: "memory://storage?ttl=1h"})
+	if initErr != nil {
+		b.Fatalf("Failed to create storage: %v", initErr)
 	}
 
 	b.Run("Single Key", func(b *testing.B) {
 		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			_, err := s.GetOrSet("key")
 			if err != nil {
 				b.Fatalf("Error in GetOrSet: %v", err)
@@ -148,7 +148,7 @@ func BenchmarkStorage_GetOrSet(b *testing.B) {
 
 	b.Run("Multiple Keys", func(b *testing.B) {
 		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for i := range b.N {
 			key := fmt.Sprintf("key%d", i%100) // Use 100 different keys
 			_, err := s.GetOrSet(key)
 			if err != nil {

@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"os"
-	"sync"
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
@@ -11,12 +10,13 @@ import (
 )
 
 type Bot struct {
-	AdminID      int64 `envconfig:"BOT__ADMIN_ID" required:"true"`
-	BanThreshold int   `envconfig:"BOT__BAN_THRESHOLD" default:"3"`
+	AdminID      int64 `envconfig:"BOT__ADMIN_ID"      required:"true"`
+	BanThreshold int   `envconfig:"BOT__BAN_THRESHOLD"                 default:"3"`
 }
 
 type Telegram struct {
 	Bot
+
 	Token string `envconfig:"TELEGRAM__TOKEN" required:"true"`
 }
 
@@ -34,28 +34,34 @@ type Config struct {
 	Storage  Storage
 }
 
-var instance = Config{
-	Telegram: Telegram{},
-	Censor: Censor{
-		Blacklist: []string{
-			"$",
-			"долл",
+func Default() Config {
+	//nolint:exhaustruct // default values
+	return Config{
+		Telegram: Telegram{},
+		Censor: Censor{
+			Blacklist: []string{
+				"$",
+				"долл",
+			},
 		},
-	},
-	Storage: Storage{
-		URL: "memory://storage?ttl=5m",
-	},
+		Storage: Storage{
+			URL: "memory://storage?ttl=5m",
+		},
+	}
 }
-var once = &sync.Once{}
 
 func Get(logger *zap.Logger) Config {
-	once.Do(func() {
-		if err := godotenv.Load(); err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				logger.Error("error loading .env file", zap.Error(err))
-			}
+	config := Default()
+
+	if err := godotenv.Load(); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			logger.Error("error loading .env file", zap.Error(err))
 		}
-		envconfig.MustProcess("", &instance)
-	})
-	return instance
+	}
+
+	if err := envconfig.Process("", &config); err != nil {
+		logger.Error("error loading environment variables", zap.Error(err))
+	}
+
+	return config
 }
