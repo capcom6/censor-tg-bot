@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"errors"
+	"fmt"
 	"time"
 )
 
@@ -24,7 +24,7 @@ func (i *item) inc() int {
 
 func newItem(ttl time.Duration) (*item, error) {
 	if ttl == 0 {
-		return nil, errors.New("ttl cannot be 0")
+		return nil, fmt.Errorf("%w: ttl must be greater than 0", ErrInvalidTTL)
 	}
 
 	return &item{

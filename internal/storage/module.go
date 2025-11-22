@@ -5,10 +5,12 @@ import (
 	"go.uber.org/zap"
 )
 
-var Module = fx.Module(
-	"storage",
-	fx.Decorate(func(logger *zap.Logger) *zap.Logger {
-		return logger.Named("storage")
-	}),
-	fx.Provide(New),
-)
+func Module() fx.Option {
+	return fx.Module(
+		"storage",
+		fx.Decorate(func(logger *zap.Logger) *zap.Logger {
+			return logger.Named("storage")
+		}),
+		fx.Provide(New),
+	)
+}

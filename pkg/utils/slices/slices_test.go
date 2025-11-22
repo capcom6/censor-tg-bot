@@ -1,7 +1,9 @@
-package slices
+package slices_test
 
 import (
 	"testing"
+
+	"github.com/capcom6/censor-tg-bot/pkg/utils/slices"
 )
 
 func TestFirstNotZero(t *testing.T) {
@@ -19,7 +21,7 @@ func TestFirstNotZero(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := FirstNotZero(tt.slice...)
+			result := slices.FirstNotZero(tt.slice...)
 			if result != tt.expected {
 				t.Errorf("Expected %d, but got %d", tt.expected, result)
 			}

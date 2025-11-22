@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"sync"
@@ -39,16 +38,16 @@ func (s *Storage) GetOrSet(key string) (int, error) {
 func New(config config.Storage) (*Storage, error) {
 	u, err := url.Parse(config.URL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: failed to parse url: %w", ErrInitFailed, err)
 	}
 
 	if u.Scheme != "memory" {
-		return nil, errors.New("only 'memory' scheme is supported")
+		return nil, fmt.Errorf("%w: unsupported scheme: %s", ErrInitFailed, u.Scheme)
 	}
 
 	ttl, err := time.ParseDuration(u.Query().Get("ttl"))
 	if err != nil {
-		return nil, fmt.Errorf("error parsing ttl: %w", err)
+		return nil, fmt.Errorf("%w: error parsing ttl: %w", ErrInitFailed, err)
 	}
 
 	return &Storage{

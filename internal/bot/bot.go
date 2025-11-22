@@ -18,14 +18,14 @@ type params struct {
 
 	Config config.Telegram
 
-	Api     *tgbotapi.BotAPI
+	API     *tgbotapi.BotAPI
 	Censor  *censor.Censor
 	Storage *storage.Storage
 
 	Logger *zap.Logger
 }
 
-type bot struct {
+type Bot struct {
 	cfg config.Telegram
 
 	api     *tgbotapi.BotAPI
@@ -35,24 +35,29 @@ type bot struct {
 	logger *zap.Logger
 }
 
-func new(params params) *bot {
-	return &bot{
+func New(params params) *Bot {
+	return &Bot{
 		cfg:     params.Config,
-		api:     params.Api,
+		api:     params.API,
 		censor:  params.Censor,
 		storage: params.Storage,
 		logger:  params.Logger,
 	}
 }
 
-func (b *bot) Start() {
+func (b *Bot) Start() {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
 	updates := b.api.GetUpdatesChan(u)
 	go func() {
 		for update := range updates {
-			message := slices.FirstNotZero(update.Message, update.EditedMessage, update.ChannelPost, update.EditedChannelPost)
+			message := slices.FirstNotZero(
+				update.Message,
+				update.EditedMessage,
+				update.ChannelPost,
+				update.EditedChannelPost,
+			)
 			if message == nil {
 				continue
 			}
@@ -64,23 +69,23 @@ func (b *bot) Start() {
 	}()
 }
 
-func (b *bot) isAllowedMessage(message tgbotapi.Message) (bool, error) {
+func (b *Bot) isAllowedMessage(message tgbotapi.Message) (bool, error) {
 	if message.From.ID == b.cfg.AdminID {
 		return true, nil
 	}
 
 	if ok, err := b.censor.IsAllow(message.Text); err != nil || !ok {
-		return ok, err
+		return ok, fmt.Errorf("failed to check text: %w", err)
 	}
 
 	if ok, err := b.censor.IsAllow(message.Caption); err != nil || !ok {
-		return ok, err
+		return ok, fmt.Errorf("failed to check caption: %w", err)
 	}
 
 	return true, nil
 }
 
-func (b *bot) processMessage(message tgbotapi.Message) error {
+func (b *Bot) processMessage(message tgbotapi.Message) error {
 	if message.From.ID == b.cfg.AdminID {
 		return nil
 	}
@@ -96,12 +101,12 @@ func (b *bot) processMessage(message tgbotapi.Message) error {
 	b.logger.Info("message not allowed", zap.Any("message", message))
 
 	deleteReq := tgbotapi.NewDeleteMessage(message.Chat.ID, message.MessageID)
-	if _, err := b.api.Request(deleteReq); err != nil {
-		return fmt.Errorf("error deleting message: %w", err)
+	if _, delErr := b.api.Request(deleteReq); delErr != nil {
+		return fmt.Errorf("error deleting message: %w", delErr)
 	}
 
-	if err := b.notifyAdmins("Removed message from " + userToString(message.From) + "\n<pre>" + message.Text + "</pre>"); err != nil {
-		return fmt.Errorf("error notifying admins: %w", err)
+	if ntfErr := b.notifyAdmins("Removed message from " + userToString(message.From) + "\n<pre>" + message.Text + "</pre>"); ntfErr != nil {
+		return fmt.Errorf("error notifying admins: %w", ntfErr)
 	}
 
 	cnt, err := b.storage.GetOrSet(strconv.FormatInt(message.From.ID, 10))
@@ -121,18 +126,18 @@ func (b *bot) processMessage(message tgbotapi.Message) error {
 			UserID: message.From.ID,
 		},
 	}
-	if _, err := b.api.Request(banReq); err != nil {
-		return fmt.Errorf("error banning user: %w", err)
+	if _, banErr := b.api.Request(banReq); banErr != nil {
+		return fmt.Errorf("error banning user: %w", banErr)
 	}
 
-	if err := b.notifyAdmins("Banned " + userToString(message.From)); err != nil {
-		return fmt.Errorf("error notifying admins: %w", err)
+	if ntfErr := b.notifyAdmins("Banned " + userToString(message.From)); ntfErr != nil {
+		return fmt.Errorf("error notifying admins: %w", ntfErr)
 	}
 
 	return nil
 }
 
-func (b *bot) notifyAdmins(message string) error {
+func (b *Bot) notifyAdmins(message string) error {
 	notifyReq := tgbotapi.NewMessage(b.cfg.AdminID, message)
 	notifyReq.ParseMode = "HTML"
 
@@ -143,6 +148,6 @@ func (b *bot) notifyAdmins(message string) error {
 	return nil
 }
 
-func (b *bot) Stop() {
+func (b *Bot) Stop() {
 	b.api.StopReceivingUpdates()
 }
