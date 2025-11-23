@@ -70,22 +70,33 @@ func (b *Bot) Start() {
 }
 
 func (b *Bot) isAllowedMessage(message tgbotapi.Message) (bool, error) {
+	if message.From == nil {
+		return false, nil
+	}
 	if message.From.ID == b.cfg.AdminID {
 		return true, nil
 	}
 
-	if ok, err := b.censor.IsAllow(message.Text); err != nil || !ok {
-		return ok, fmt.Errorf("failed to check text: %w", err)
+	if ok, err := b.censor.IsAllow(message.Text); err != nil {
+		return false, fmt.Errorf("failed to check text: %w", err)
+	} else if !ok {
+		return false, nil
 	}
 
-	if ok, err := b.censor.IsAllow(message.Caption); err != nil || !ok {
-		return ok, fmt.Errorf("failed to check caption: %w", err)
+	if ok, err := b.censor.IsAllow(message.Caption); err != nil {
+		return false, fmt.Errorf("failed to check caption: %w", err)
+	} else if !ok {
+		return false, nil
 	}
 
 	return true, nil
 }
 
 func (b *Bot) processMessage(message tgbotapi.Message) error {
+	if message.From == nil {
+		b.logger.Warn("message.From is nil, skipping processing")
+		return nil
+	}
 	if message.From.ID == b.cfg.AdminID {
 		return nil
 	}
