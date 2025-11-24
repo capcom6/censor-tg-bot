@@ -23,7 +23,7 @@ func TestFirstNotZero(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := slices.FirstNotZero(tt.slice...)
 			if result != tt.expected {
-				t.Errorf("Expected %d, but got %d", tt.expected, result)
+				t.Errorf("Expected %v, but got %v", tt.expected, result)
 			}
 		})
 	}
