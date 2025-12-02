@@ -10,7 +10,7 @@ A simple keyword-based antispam bot for Telegram, written in Go.
 
 ## Prerequisites
 
-- Go 1.22 (for building the binary)
+- Go 1.24 (for building the binary)
 - Docker (for containerized deployment)
 
 ## Configuration

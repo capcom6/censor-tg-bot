@@ -3,8 +3,6 @@ package censor
 import (
 	"regexp"
 	"strings"
-
-	"github.com/capcom6/censor-tg-bot/internal/config"
 )
 
 var filter = regexp.MustCompile(`[^\p{Cyrillic}\p{Latin}][:graph:]`)
@@ -13,7 +11,7 @@ type Censor struct {
 	blacklist []string
 }
 
-func New(config config.Censor) *Censor {
+func New(config Config) *Censor {
 	return &Censor{
 		blacklist: config.Blacklist,
 	}

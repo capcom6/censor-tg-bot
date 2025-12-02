@@ -1,33 +1,18 @@
 package bot
 
 import (
-	"context"
-
+	"github.com/capcom6/censor-tg-bot/pkg/tgbotapifx"
+	"github.com/go-core-fx/logger"
 	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
 func Module() fx.Option {
 	return fx.Module(
 		"bot",
-		fx.Decorate(func(logger *zap.Logger) *zap.Logger {
-			return logger.Named("bot")
-		}),
-		fx.Provide(newAPI, fx.Private),
+		logger.WithNamedLogger("bot"),
 		fx.Provide(New),
-		fx.Invoke(func(lc fx.Lifecycle, bot *Bot, log *zap.Logger) {
-			lc.Append(fx.Hook{
-				OnStart: func(_ context.Context) error {
-					bot.Start()
-					log.Info("bot started")
-					return nil
-				},
-				OnStop: func(_ context.Context) error {
-					bot.Stop()
-					log.Info("bot stopped")
-					return nil
-				},
-			})
+		fx.Invoke(func(bot *Bot, api *tgbotapifx.Bot) {
+			api.SetDefaultHandler(bot.Handler)
 		}),
 	)
 }
