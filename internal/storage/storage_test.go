@@ -5,47 +5,46 @@ import (
 	"testing"
 	"time"
 
-	"github.com/capcom6/censor-tg-bot/internal/config"
 	"github.com/capcom6/censor-tg-bot/internal/storage"
 )
 
 func TestNew(t *testing.T) {
 	tests := []struct {
 		name    string
-		config  config.Storage
+		config  storage.Config
 		wantErr bool
 	}{
 		{
 			name: "valid memory scheme URL",
-			config: config.Storage{
+			config: storage.Config{
 				URL: "memory://storage?ttl=5m",
 			},
 			wantErr: false,
 		},
 		{
 			name: "invalid scheme URL",
-			config: config.Storage{
+			config: storage.Config{
 				URL: "http://storage?ttl=5m",
 			},
 			wantErr: true,
 		},
 		{
 			name: "URL with invalid TTL query parameter",
-			config: config.Storage{
+			config: storage.Config{
 				URL: "memory://storage?ttl=abc",
 			},
 			wantErr: true,
 		},
 		{
 			name: "URL with missing TTL query parameter",
-			config: config.Storage{
+			config: storage.Config{
 				URL: "memory://storage",
 			},
 			wantErr: true,
 		},
 		{
 			name: "URL with valid TTL query parameter",
-			config: config.Storage{
+			config: storage.Config{
 				URL: "memory://storage?ttl=10s",
 			},
 			wantErr: false,
@@ -64,7 +63,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestStorage_GetOrSet(t *testing.T) {
-	s, initErr := storage.New(config.Storage{URL: "memory://storage?ttl=1h"})
+	s, initErr := storage.New(storage.Config{URL: "memory://storage?ttl=1h"})
 	if initErr != nil {
 		t.Fatalf("Failed to create storage: %v", initErr)
 	}
@@ -112,7 +111,7 @@ func TestStorage_GetOrSet(t *testing.T) {
 }
 
 func TestStorage_GetOrSet_Expiration(t *testing.T) {
-	s, initErr := storage.New(config.Storage{URL: "memory://storage?ttl=1ms"})
+	s, initErr := storage.New(storage.Config{URL: "memory://storage?ttl=1ms"})
 	if initErr != nil {
 		t.Fatalf("Failed to create storage: %v", initErr)
 	}
@@ -131,7 +130,7 @@ func TestStorage_GetOrSet_Expiration(t *testing.T) {
 }
 
 func BenchmarkStorage_GetOrSet(b *testing.B) {
-	s, initErr := storage.New(config.Storage{URL: "memory://storage?ttl=1h"})
+	s, initErr := storage.New(storage.Config{URL: "memory://storage?ttl=1h"})
 	if initErr != nil {
 		b.Fatalf("Failed to create storage: %v", initErr)
 	}

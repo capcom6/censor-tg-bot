@@ -1,42 +1,41 @@
 package config
 
 import (
-	"errors"
-	"os"
+	"fmt"
 
-	"github.com/joho/godotenv"
-	"github.com/kelseyhightower/envconfig"
-	"go.uber.org/zap"
+	"github.com/go-core-fx/config"
 )
 
 type Bot struct {
-	AdminID      int64 `envconfig:"BOT__ADMIN_ID"      required:"true"`
-	BanThreshold int   `envconfig:"BOT__BAN_THRESHOLD"                 default:"3"`
+	AdminID      int64 `koanf:"admin_id"`
+	BanThreshold uint8 `koanf:"ban_threshold"`
 }
 
 type Telegram struct {
-	Bot
-
-	Token string `envconfig:"TELEGRAM__TOKEN" required:"true"`
+	Token string `koanf:"token"`
 }
 
 type Censor struct {
-	Blacklist []string `envconfig:"CENSOR__BLACKLIST"`
+	Blacklist []string `koanf:"blacklist"`
 }
 
 type Storage struct {
-	URL string `envconfig:"STORAGE__URL"`
+	URL string `koanf:"url"`
 }
 
 type Config struct {
-	Telegram Telegram
-	Censor   Censor
-	Storage  Storage
+	Bot      Bot      `koanf:"bot"`
+	Telegram Telegram `koanf:"telegram"`
+	Censor   Censor   `koanf:"censor"`
+	Storage  Storage  `koanf:"storage"`
 }
 
 func Default() Config {
-	//nolint:exhaustruct // default values
+	//nolint:exhaustruct,mnd // default values
 	return Config{
+		Bot: Bot{
+			BanThreshold: 3,
+		},
 		Telegram: Telegram{},
 		Censor: Censor{
 			Blacklist: []string{
@@ -50,18 +49,12 @@ func Default() Config {
 	}
 }
 
-func Get(logger *zap.Logger) Config {
-	config := Default()
+func New() (Config, error) {
+	cfg := Default()
 
-	if err := godotenv.Load(); err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			logger.Error("error loading .env file", zap.Error(err))
-		}
+	if err := config.Load(&cfg); err != nil {
+		return Config{}, fmt.Errorf("failed to load config: %w", err)
 	}
 
-	if err := envconfig.Process("", &config); err != nil {
-		logger.Error("error loading environment variables", zap.Error(err))
-	}
-
-	return config
+	return cfg, nil
 }

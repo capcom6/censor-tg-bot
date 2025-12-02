@@ -5,8 +5,6 @@ import (
 	"net/url"
 	"sync"
 	"time"
-
-	"github.com/capcom6/censor-tg-bot/internal/config"
 )
 
 type Storage struct {
@@ -35,7 +33,7 @@ func (s *Storage) GetOrSet(key string) (int, error) {
 	return 1, nil
 }
 
-func New(config config.Storage) (*Storage, error) {
+func New(config Config) (*Storage, error) {
 	u, err := url.Parse(config.URL)
 	if err != nil {
 		return nil, fmt.Errorf("%w: failed to parse url: %w", ErrInitFailed, err)

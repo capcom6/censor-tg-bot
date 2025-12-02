@@ -7,22 +7,23 @@ import (
 	"github.com/capcom6/censor-tg-bot/internal/censor"
 	"github.com/capcom6/censor-tg-bot/internal/config"
 	"github.com/capcom6/censor-tg-bot/internal/storage"
-	"github.com/capcom6/go-infra-fx/logger"
+	"github.com/capcom6/censor-tg-bot/pkg/tgbotapifx"
+	"github.com/go-core-fx/logger"
 	"go.uber.org/fx"
-	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 func module() fx.Option {
 	return fx.Module(
 		"main",
-		fx.Invoke(func(lc fx.Lifecycle) {
+		fx.Invoke(func(lc fx.Lifecycle, logger *zap.Logger) {
 			lc.Append(fx.Hook{
 				OnStart: func(_ context.Context) error {
+					logger.Info("app started")
 					return nil
 				},
 				OnStop: func(_ context.Context) error {
+					logger.Info("app stopped")
 					return nil
 				},
 			})
@@ -32,12 +33,10 @@ func module() fx.Option {
 
 func main() {
 	fx.New(
-		fx.WithLogger(func(logger *zap.Logger) fxevent.Logger {
-			logOption := fxevent.ZapLogger{Logger: logger}
-			logOption.UseLogLevel(zapcore.DebugLevel)
-			return &logOption
-		}),
-		logger.Module,
+		logger.WithFxDefaultLogger(),
+		logger.Module(),
+		tgbotapifx.Module(),
+		//
 		config.Module(),
 		censor.Module(),
 		storage.Module(),
