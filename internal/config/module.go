@@ -8,6 +8,7 @@ import (
 	"github.com/capcom6/censor-tg-bot/internal/censor"
 	"github.com/capcom6/censor-tg-bot/internal/storage"
 	"github.com/capcom6/censor-tg-bot/pkg/tgbotapifx"
+	"github.com/go-core-fx/fiberfx"
 	"go.uber.org/fx"
 )
 
@@ -36,6 +37,13 @@ func Module() fx.Option {
 		fx.Provide(func(cfg Config) storage.Config {
 			return storage.Config{
 				URL: cfg.Storage.URL,
+			}
+		}),
+		fx.Provide(func(cfg Config) fiberfx.Config {
+			return fiberfx.Config{
+				Address:     cfg.HTTP.Address,
+				ProxyHeader: cfg.HTTP.ProxyHeader,
+				Proxies:     cfg.HTTP.Proxies,
 			}
 		}),
 	)

@@ -1,4 +1,4 @@
-@baseUrl=https://api.telegram.org/bot{{$dotenv TELEGRAM__TOKEN}}
+@baseUrl=http://localhost:3000
 
 ###
-GET {{baseUrl}}/getUpdates HTTP/1.1
+GET {{baseUrl}}/metrics HTTP/1.1

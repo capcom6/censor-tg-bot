@@ -1,0 +1,68 @@
+groups:
+  - name: censor-bot-alerts
+    rules:
+      # Bot Alerts
+      - alert: HighBotActionFailureRate
+        expr: rate(bot_processed_actions_total{status="failed"}[5m]) / rate(bot_processed_actions_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High bot action failure rate (instance {{ $labels.instance }})"
+          description: "More than 10% of bot actions are failing\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      - alert: BotActionFailures
+        expr: increase(bot_processed_actions_total{status="failed"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Bot action failures detected (instance {{ $labels.instance }})"
+          description: "More than 5 bot actions have failed in the last 5 minutes\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      # Censor Alerts
+      - alert: HighMessageFilterRate
+        expr: rate(censor_processed_total{result="filtered"}[5m]) / rate(censor_processed_total[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High message filter rate (instance {{ $labels.instance }})"
+          description: "More than 80% of messages are being filtered\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      - alert: NoMessagesProcessed
+        expr: sum(rate(censor_processed_total[5m])) == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No messages processed (instance {{ $labels.instance }})"
+          description: "No messages have been processed in the last 10 minutes\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      # Server Alerts
+      - alert: HighHTTPErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP error rate (instance {{ $labels.instance }})"
+          description: "More than 5% of HTTP requests are returning 5xx errors\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      - alert: HighHTTPRequestLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP request latency (instance {{ $labels.instance }})"
+          description: "95th percentile HTTP request latency is above 1 second\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      - alert: HighHTTPThroughput
+        expr: rate(http_requests_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP throughput (instance {{ $labels.instance }})"
+          description: "HTTP request rate is above 100 requests per second\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"

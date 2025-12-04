@@ -6,8 +6,10 @@ import (
 	"github.com/capcom6/censor-tg-bot/internal/bot"
 	"github.com/capcom6/censor-tg-bot/internal/censor"
 	"github.com/capcom6/censor-tg-bot/internal/config"
+	"github.com/capcom6/censor-tg-bot/internal/server"
 	"github.com/capcom6/censor-tg-bot/internal/storage"
 	"github.com/capcom6/censor-tg-bot/pkg/tgbotapifx"
+	"github.com/go-core-fx/fiberfx"
 	"github.com/go-core-fx/logger"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -36,11 +38,13 @@ func main() {
 		logger.WithFxDefaultLogger(),
 		logger.Module(),
 		tgbotapifx.Module(),
+		fiberfx.Module(),
 		//
 		config.Module(),
 		censor.Module(),
 		storage.Module(),
 		bot.Module(),
+		server.Module(),
 		module(),
 	).Run()
 }

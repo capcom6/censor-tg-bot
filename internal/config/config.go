@@ -23,11 +23,18 @@ type Storage struct {
 	URL string `koanf:"url"`
 }
 
+type HTTP struct {
+	Address     string   `koanf:"address"`
+	ProxyHeader string   `koanf:"proxy_header"`
+	Proxies     []string `koanf:"proxies"`
+}
+
 type Config struct {
 	Bot      Bot      `koanf:"bot"`
 	Telegram Telegram `koanf:"telegram"`
 	Censor   Censor   `koanf:"censor"`
 	Storage  Storage  `koanf:"storage"`
+	HTTP     HTTP     `koanf:"http"`
 }
 
 func Default() Config {
@@ -45,6 +52,11 @@ func Default() Config {
 		},
 		Storage: Storage{
 			URL: "memory://storage?ttl=5m",
+		},
+		HTTP: HTTP{
+			Address:     "127.0.0.1:3000",
+			ProxyHeader: "X-Forwarded-For",
+			Proxies:     []string{},
 		},
 	}
 }
