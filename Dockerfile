@@ -18,7 +18,7 @@ COPY . .
 RUN CGO_ENABLED=0 go build -a -installsuffix cgo -o app .
 
 # Moving the binary to the 'final Image' to make it smaller
-FROM alpine:3 as prod
+FROM alpine:3.22.2 as prod
 
 WORKDIR /app
 
