@@ -15,6 +15,7 @@ func Module() fx.Option {
 		fx.Provide(func(log *zap.Logger) fiberfx.Options {
 			opts := fiberfx.Options{}
 			opts.WithErrorHandler(fiberfx.NewJSONErrorHandler(log))
+			opts.WithMetrics()
 			return opts
 		}),
 

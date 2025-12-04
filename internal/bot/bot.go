@@ -18,15 +18,17 @@ type Bot struct {
 
 	censor  *censor.Censor
 	storage *storage.Storage
+	metrics *Metrics
 
 	logger *zap.Logger
 }
 
-func New(cfg Config, censor *censor.Censor, storage *storage.Storage, logger *zap.Logger) *Bot {
+func New(cfg Config, censor *censor.Censor, storage *storage.Storage, metrics *Metrics, logger *zap.Logger) *Bot {
 	return &Bot{
 		config:  cfg,
 		censor:  censor,
 		storage: storage,
+		metrics: metrics,
 		logger:  logger,
 	}
 }
@@ -42,7 +44,13 @@ func (b *Bot) Handler(_ context.Context, bot *tgbotapifx.Bot, update tgbotapi.Up
 		return nil
 	}
 
-	return b.processMessage(bot, message)
+	if err := b.processMessage(bot, message); err != nil {
+		b.metrics.IncProcessedAction(MetricLabelActionMessageProcessed, MetricLabelStatusFailed)
+		return err
+	}
+
+	b.metrics.IncProcessedAction(MetricLabelActionMessageProcessed, MetricLabelStatusSuccess)
+	return nil
 }
 
 func (b *Bot) processMessage(bot *tgbotapifx.Bot, message *tgbotapi.Message) error {
@@ -63,12 +71,16 @@ func (b *Bot) processMessage(bot *tgbotapifx.Bot, message *tgbotapi.Message) err
 
 	deleteReq := tgbotapi.NewDeleteMessage(message.Chat.ID, message.MessageID)
 	if _, delErr := bot.Request(deleteReq); delErr != nil {
+		b.metrics.IncProcessedAction(MetricLabelActionMessageDeleted, MetricLabelStatusFailed)
 		return fmt.Errorf("error deleting message: %w", delErr)
 	}
+	b.metrics.IncProcessedAction(MetricLabelActionMessageDeleted, MetricLabelStatusSuccess)
 
 	if ntfErr := b.notifyAdmins(bot, "Removed message from "+userToString(message.From)+"\n<pre>"+message.Text+"</pre>"); ntfErr != nil {
+		b.metrics.IncProcessedAction(MetricLabelActionAdminNotified, MetricLabelStatusFailed)
 		return fmt.Errorf("error notifying admins: %w", ntfErr)
 	}
+	b.metrics.IncProcessedAction(MetricLabelActionAdminNotified, MetricLabelStatusSuccess)
 
 	cnt, err := b.storage.GetOrSet(strconv.FormatInt(message.From.ID, 10))
 	if err != nil {
@@ -88,8 +100,10 @@ func (b *Bot) processMessage(bot *tgbotapifx.Bot, message *tgbotapi.Message) err
 		},
 	}
 	if _, banErr := bot.Request(banReq); banErr != nil {
+		b.metrics.IncProcessedAction(MetricLabelActionUserBanned, MetricLabelStatusFailed)
 		return fmt.Errorf("error banning user: %w", banErr)
 	}
+	b.metrics.IncProcessedAction(MetricLabelActionUserBanned, MetricLabelStatusSuccess)
 
 	if ntfErr := b.notifyAdmins(bot, "Banned "+userToString(message.From)); ntfErr != nil {
 		return fmt.Errorf("error notifying admins: %w", ntfErr)

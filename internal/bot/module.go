@@ -10,6 +10,7 @@ func Module() fx.Option {
 	return fx.Module(
 		"bot",
 		logger.WithNamedLogger("bot"),
+		fx.Provide(NewMetrics, fx.Private),
 		fx.Provide(New),
 		fx.Invoke(func(bot *Bot, api *tgbotapifx.Bot) {
 			api.SetDefaultHandler(bot.Handler)
