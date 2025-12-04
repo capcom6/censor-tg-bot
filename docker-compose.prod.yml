@@ -1,6 +1,6 @@
 services:
   bot:
-    image: capcom6/censor-tg-bot:latest
+    image: ghcr.io/capcom6/censor-tg-bot:latest
     environment:
       - BOT__ADMIN_ID=${TELEGRAM__ADMIN_ID}
       - BOT__BAN_THRESHOLD=3
