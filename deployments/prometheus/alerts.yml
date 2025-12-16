@@ -21,23 +21,23 @@ groups:
           description: "More than 5 bot actions have failed in the last 5 minutes\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
       # Censor Alerts
-      - alert: HighMessageFilterRate
-        expr: rate(censor_processed_total{result="filtered"}[5m]) / rate(censor_processed_total[5m]) > 0.8
+      - alert: HighPluginEvaluationFailureRate
+        expr: rate(censor_plugin_errors_total[5m]) / rate(censor_plugin_evaluations_total[5m]) > 0.1 and rate(censor_plugin_evaluations_total[5m]) > 0
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "High message filter rate (instance {{ $labels.instance }})"
-          description: "More than 80% of messages are being filtered\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+          summary: "High plugin evaluation failure rate (instance {{ $labels.instance }})"
+          description: "More than 10% of plugin evaluations are failing\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
-      - alert: NoMessagesProcessed
-        expr: sum(rate(censor_processed_total[5m])) == 0
-        for: 10m
+      - alert: HighPluginEvaluationFailures
+        expr: increase(censor_plugin_errors_total[5m]) > 5
+        for: 2m
         labels:
-          severity: warning
+          severity: critical
         annotations:
-          summary: "No messages processed (instance {{ $labels.instance }})"
-          description: "No messages have been processed in the last 10 minutes\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+          summary: "High plugin evaluation failures (instance {{ $labels.instance }})"
+          description: "More than 5 plugin evaluations have failed in the last 5 minutes\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
       # Server Alerts
       - alert: HighHTTPErrorRate

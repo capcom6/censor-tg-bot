@@ -1,0 +1,28 @@
+censor:
+  strategy: sequential
+  timeout: 30s
+  enabled_only: true
+  plugins:
+    keyword:
+      enabled: true
+      priority: 10
+      config:
+        blacklist:
+          - spam
+          - scam
+          - phishing
+
+    ratelimit:
+      enabled: true
+      priority: 5
+      config:
+        max_messages: 5
+        window: "1m"
+
+    regex:
+      enabled: true
+      priority: 20
+      config:
+        patterns:
+          - '(?i)https?://[\w\-\.]+\.xyz' # Block .xyz domains
+          - '\b\d{16}\b' # Block credit card numbers
