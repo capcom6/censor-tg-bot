@@ -64,7 +64,7 @@
             },
             {
                 "type": "graph",
-                "title": "Censor Results Over Time",
+                "title": "Censor Plugin Evaluation Over Time",
                 "id": 4,
                 "gridPos": {
                     "h": 8,
@@ -74,15 +74,15 @@
                 },
                 "targets": [
                     {
-                        "expr": "rate(censor_filtered_total[5m])",
-                        "legendFormat": "{{result}}"
+                        "expr": "rate(censor_plugin_evaluations_total[5m])",
+                        "legendFormat": "{{plugin}} - {{action}}"
                     }
                 ],
                 "datasource": "Prometheus"
             },
             {
                 "type": "stat",
-                "title": "Total Filtered Messages",
+                "title": "Total Plugin Evaluations",
                 "id": 5,
                 "gridPos": {
                     "h": 4,
@@ -92,7 +92,7 @@
                 },
                 "targets": [
                     {
-                        "expr": "censor_filtered_total{result=\"filtered\"}",
+                        "expr": "sum(censor_plugin_evaluations_total)",
                         "stat": "total"
                     }
                 ],
@@ -100,7 +100,7 @@
             },
             {
                 "type": "piechart",
-                "title": "Censor Result Distribution",
+                "title": "Plugin Evaluation Distribution",
                 "id": 6,
                 "gridPos": {
                     "h": 8,
@@ -110,8 +110,44 @@
                 },
                 "targets": [
                     {
-                        "expr": "censor_filtered_total",
-                        "legendFormat": "{{result}}"
+                        "expr": "censor_plugin_evaluations_total",
+                        "legendFormat": "{{plugin}} ({{action}})"
+                    }
+                ],
+                "datasource": "Prometheus"
+            },
+            {
+                "type": "graph",
+                "title": "Plugin Evaluation Duration",
+                "id": 7,
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 16
+                },
+                "targets": [
+                    {
+                        "expr": "histogram_quantile(0.95, rate(censor_plugin_duration_seconds_bucket[5m]))",
+                        "legendFormat": "{{plugin}} p95"
+                    }
+                ],
+                "datasource": "Prometheus"
+            },
+            {
+                "type": "stat",
+                "title": "95th Percentile Plugin Duration",
+                "id": 8,
+                "gridPos": {
+                    "h": 4,
+                    "w": 6,
+                    "x": 12,
+                    "y": 16
+                },
+                "targets": [
+                    {
+                        "expr": "histogram_quantile(0.95, rate(censor_plugin_duration_seconds_bucket[5m]))",
+                        "stat": "max"
                     }
                 ],
                 "datasource": "Prometheus"
@@ -119,12 +155,12 @@
             {
                 "type": "graph",
                 "title": "HTTP Request Rate",
-                "id": 7,
+                "id": 9,
                 "gridPos": {
                     "h": 8,
                     "w": 12,
                     "x": 0,
-                    "y": 16
+                    "y": 24
                 },
                 "targets": [
                     {
@@ -137,12 +173,12 @@
             {
                 "type": "stat",
                 "title": "Total HTTP Requests",
-                "id": 8,
+                "id": 10,
                 "gridPos": {
                     "h": 4,
                     "w": 6,
                     "x": 12,
-                    "y": 16
+                    "y": 24
                 },
                 "targets": [
                     {
@@ -155,12 +191,12 @@
             {
                 "type": "graph",
                 "title": "HTTP Request Duration",
-                "id": 9,
+                "id": 11,
                 "gridPos": {
                     "h": 8,
                     "w": 12,
                     "x": 0,
-                    "y": 24
+                    "y": 32
                 },
                 "targets": [
                     {
@@ -173,12 +209,12 @@
             {
                 "type": "stat",
                 "title": "95th Percentile Request Duration",
-                "id": 10,
+                "id": 12,
                 "gridPos": {
                     "h": 4,
                     "w": 6,
                     "x": 12,
-                    "y": 24
+                    "y": 32
                 },
                 "targets": [
                     {

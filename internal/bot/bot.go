@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/capcom6/censor-tg-bot/internal/censor"
+	"github.com/capcom6/censor-tg-bot/internal/censor/plugin"
 	"github.com/capcom6/censor-tg-bot/internal/storage"
 	"github.com/capcom6/censor-tg-bot/pkg/tgbotapifx"
 	"github.com/capcom6/censor-tg-bot/pkg/utils/slices"
@@ -16,14 +17,14 @@ import (
 type Bot struct {
 	config Config
 
-	censor  *censor.Censor
+	censor  *censor.Service
 	storage *storage.Storage
 	metrics *Metrics
 
 	logger *zap.Logger
 }
 
-func New(cfg Config, censor *censor.Censor, storage *storage.Storage, metrics *Metrics, logger *zap.Logger) *Bot {
+func New(cfg Config, censor *censor.Service, storage *storage.Storage, metrics *Metrics, logger *zap.Logger) *Bot {
 	return &Bot{
 		config:  cfg,
 		censor:  censor,
@@ -33,7 +34,7 @@ func New(cfg Config, censor *censor.Censor, storage *storage.Storage, metrics *M
 	}
 }
 
-func (b *Bot) Handler(_ context.Context, bot *tgbotapifx.Bot, update tgbotapi.Update) error {
+func (b *Bot) Handler(ctx context.Context, bot *tgbotapifx.Bot, update tgbotapi.Update) error {
 	message := slices.FirstNotZero(
 		update.Message,
 		update.EditedMessage,
@@ -44,7 +45,7 @@ func (b *Bot) Handler(_ context.Context, bot *tgbotapifx.Bot, update tgbotapi.Up
 		return nil
 	}
 
-	if err := b.processMessage(bot, message); err != nil {
+	if err := b.processMessage(ctx, bot, message); err != nil {
 		b.metrics.IncProcessedAction(MetricLabelActionMessageProcessed, MetricLabelStatusFailed)
 		return err
 	}
@@ -53,21 +54,18 @@ func (b *Bot) Handler(_ context.Context, bot *tgbotapifx.Bot, update tgbotapi.Up
 	return nil
 }
 
-func (b *Bot) processMessage(bot *tgbotapifx.Bot, message *tgbotapi.Message) error {
-	if message.From == nil {
-		b.logger.Warn("message.From is nil, skipping processing")
+func (b *Bot) processMessage(ctx context.Context, bot *tgbotapifx.Bot, message *tgbotapi.Message) error {
+	result := b.evaluateMessage(ctx, message)
+	if result.Action != plugin.ActionBlock {
 		return nil
 	}
 
-	ok, err := b.isAllowedMessage(message)
-	if err != nil {
-		return fmt.Errorf("error checking message: %w", err)
-	}
-	if ok {
-		return nil
-	}
-
-	b.logger.Info("message not allowed", zap.Any("message", message))
+	b.logger.Info("message blocked",
+		zap.String("plugin", result.Plugin),
+		zap.String("reason", result.Reason),
+		zap.Any("metadata", result.Metadata),
+		zap.Any("message", message),
+	)
 
 	deleteReq := tgbotapi.NewDeleteMessage(message.Chat.ID, message.MessageID)
 	if _, delErr := bot.Request(deleteReq); delErr != nil {
@@ -76,7 +74,15 @@ func (b *Bot) processMessage(bot *tgbotapifx.Bot, message *tgbotapi.Message) err
 	}
 	b.metrics.IncProcessedAction(MetricLabelActionMessageDeleted, MetricLabelStatusSuccess)
 
-	if ntfErr := b.notifyAdmins(bot, "Removed message from "+userToString(message.From)+"\n<pre>"+message.Text+"</pre>"); ntfErr != nil {
+	// Enhanced admin notification with plugin details
+	notification := fmt.Sprintf(
+		"Removed message from %s\nPlugin: %s\nReason: %s\n<pre>%s</pre>",
+		userToString(message.From),
+		result.Plugin,
+		result.Reason,
+		message.Text,
+	)
+	if ntfErr := b.notifyAdmins(bot, notification); ntfErr != nil {
 		b.metrics.IncProcessedAction(MetricLabelActionAdminNotified, MetricLabelStatusFailed)
 		return fmt.Errorf("error notifying admins: %w", ntfErr)
 	}
@@ -112,27 +118,42 @@ func (b *Bot) processMessage(bot *tgbotapifx.Bot, message *tgbotapi.Message) err
 	return nil
 }
 
-func (b *Bot) isAllowedMessage(message *tgbotapi.Message) (bool, error) {
+func (b *Bot) evaluateMessage(ctx context.Context, message *tgbotapi.Message) plugin.Result {
 	if message.From == nil {
-		return false, nil
+		return plugin.Result{
+			Action:   plugin.ActionSkip,
+			Reason:   "message from is nil",
+			Metadata: nil,
+			Plugin:   "bot",
+		}
 	}
 	if message.From.ID == b.config.AdminID {
-		return true, nil
+		return plugin.Result{
+			Action:   plugin.ActionAllow,
+			Reason:   "message from admin",
+			Metadata: nil,
+			Plugin:   "bot",
+		}
 	}
 
-	if ok, err := b.censor.IsAllow(message.Text); err != nil {
-		return false, fmt.Errorf("failed to check text: %w", err)
-	} else if !ok {
-		return false, nil
+	chatID := int64(0)
+	if message.Chat != nil {
+		chatID = message.Chat.ID
 	}
 
-	if ok, err := b.censor.IsAllow(message.Caption); err != nil {
-		return false, fmt.Errorf("failed to check caption: %w", err)
-	} else if !ok {
-		return false, nil
-	}
+	result := b.censor.Evaluate(
+		ctx,
+		plugin.Message{
+			Text:      message.Text,
+			Caption:   message.Caption,
+			UserID:    message.From.ID,
+			ChatID:    chatID,
+			MessageID: message.MessageID,
+			IsEdit:    message.EditDate != 0,
+		},
+	)
 
-	return true, nil
+	return result
 }
 
 func (b *Bot) notifyAdmins(bot *tgbotapifx.Bot, message string) error {

@@ -6,7 +6,7 @@ VERSION ?= $(GIT_VERSION)
 DOCKER_CR ?= $(shell basename $$(dirname $(PWD)))
 DOCKER_IMAGE := ${DOCKER_CR}/$(BINARY_NAME):$(VERSION)
 
-all: fmt lint test benchmark ## Run all tests and checks
+all: fmt lint coverage ## Run all tests and checks
 
 version: ## Display current version
 	@echo "Current version: $(VERSION)"
