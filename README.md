@@ -105,6 +105,7 @@ keyword:
     blacklist:
       - spam
       - scam
+      - phishing
 ```
 
 **Use Cases:**
@@ -152,6 +153,29 @@ regex:
 - Blocking URL patterns
 - Detecting credit card numbers
 - Filtering complex patterns
+
+---
+
+### Forwarded Plugin
+Blocks forwarded messages from non-exception sources, allowing only messages from specified user IDs and chat IDs.
+
+**Configuration:**
+```yaml
+forwarded:
+  enabled: true
+  priority: 15  # Execute after rate limiting and keyword, before regex
+  config:
+    allowed_user_ids:
+      - 123456789
+      - 987654321
+    allowed_chat_ids:
+      - -1001234567890
+```
+
+**Use Cases:**
+- Preventing unauthorized message forwarding in groups
+- Controlling content flow from specific channels/chats
+- Implementing content source restrictions
 
 ## Execution Strategies
 
