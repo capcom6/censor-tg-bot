@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugins"
+	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/forwarded"
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/keyword"
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/ratelimit"
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/regex"
@@ -61,6 +62,21 @@ func Module() fx.Option {
 				c, err := ratelimit.NewConfig(configMap)
 				if err != nil {
 					return c, fmt.Errorf("failed to create ratelimit config: %w", err)
+				}
+
+				return c, nil
+			},
+		),
+		fx.Provide(
+			func(config Config) (forwarded.Config, error) {
+				configMap := map[string]any{}
+				if v, ok := config.Plugins["forwarded"]; ok {
+					configMap = v.Config
+				}
+
+				c, err := forwarded.NewConfig(configMap)
+				if err != nil {
+					return c, fmt.Errorf("failed to create forwarded config: %w", err)
 				}
 
 				return c, nil

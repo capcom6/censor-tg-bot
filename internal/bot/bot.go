@@ -150,6 +150,18 @@ func (b *Bot) evaluateMessage(ctx context.Context, message *tgbotapi.Message) pl
 			ChatID:    chatID,
 			MessageID: message.MessageID,
 			IsEdit:    message.EditDate != 0,
+			ForwardedFromUserID: func() *int64 {
+				if message.ForwardFrom != nil {
+					return &message.ForwardFrom.ID
+				}
+				return nil
+			}(),
+			ForwardedFromChatID: func() *int64 {
+				if message.ForwardFromChat != nil {
+					return &message.ForwardFromChat.ID
+				}
+				return nil
+			}(),
 		},
 	)
 

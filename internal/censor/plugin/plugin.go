@@ -25,12 +25,14 @@ func (a Action) IsValid() bool {
 
 // Message contains all inspectable content from a Telegram message.
 type Message struct {
-	Text      string // Message text
-	Caption   string // Message caption (for media)
-	UserID    int64  // User ID who sent the message
-	ChatID    int64  // Chat ID where message was sent
-	MessageID int    // Message ID
-	IsEdit    bool   // Whether this is an edited message
+	Text                string // Message text
+	Caption             string // Message caption (for media)
+	UserID              int64  // User ID who sent the message
+	ChatID              int64  // Chat ID where message was sent
+	MessageID           int    // Message ID
+	IsEdit              bool   // Whether this is an edited message
+	ForwardedFromUserID *int64 // User ID of original message author (if forwarded)
+	ForwardedFromChatID *int64 // Chat ID where original message was sent (if forwarded)
 }
 
 // Plugin is the interface that all censor plugins must implement.
