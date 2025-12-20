@@ -145,6 +145,15 @@ func (s *Service) Evaluate(ctx context.Context, msg plugin.Message) plugin.Resul
 	return result
 }
 
+func (s *Service) Cleanup(ctx context.Context) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, p := range s.plugins {
+		p.Cleanup(ctx)
+	}
+}
+
 // getPluginPriority returns the priority of a plugin.
 func (s *Service) getPluginPriority(p plugin.Plugin) int {
 	if c, ok := s.config.Plugins[p.Name()]; ok {

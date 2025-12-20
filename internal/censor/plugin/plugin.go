@@ -46,4 +46,8 @@ type Plugin interface {
 	// Priority returns the execution priority (lower = earlier execution)
 	// Useful for short-circuiting expensive operations
 	Priority() int
+
+	// Cleanup performs maintenance tasks for the plugin.
+	// Called periodically to clean up expired entries.
+	Cleanup(ctx context.Context)
 }

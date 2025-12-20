@@ -13,11 +13,11 @@ type Plugin struct {
 	storage     *Storage
 }
 
-func New(config Config, storage *Storage) plugin.Plugin {
+func New(config Config) plugin.Plugin {
 	return &Plugin{
 		maxMessages: config.MaxMessages,
 		window:      config.Window,
-		storage:     storage,
+		storage:     NewStorage(),
 	}
 }
 
@@ -54,4 +54,9 @@ func (p *Plugin) Evaluate(_ context.Context, msg plugin.Message) (plugin.Result,
 		Metadata: nil,
 		Plugin:   p.Name(),
 	}, nil
+}
+
+// Cleanup implements plugin.Plugin.
+func (p *Plugin) Cleanup(_ context.Context) {
+	p.storage.Cleanup()
 }

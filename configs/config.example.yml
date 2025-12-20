@@ -42,3 +42,19 @@ censor:
         # allowed_chat_ids:
         #   - -1001234567890  # Official channel ID (negative for supergroups/channels)
         #   - -1000987654321  # Another allowed chat
+
+    # Duplicate plugin - detects and blocks repetitive messages from users
+    # This plugin tracks identical or very similar messages within a time window
+    # and blocks users who exceed the maximum duplicate threshold.
+    # Priority: 150 (runs after rate limit, keyword, and regex checks)
+    duplicate:
+      enabled: true
+      priority: 150
+      config:
+        # Maximum number of duplicate messages allowed before blocking
+        max_duplicates: 1
+
+        # Time window to consider messages as duplicates
+        # Messages sent within this timeframe are compared for similarity
+        # Supported formats: "30s", "5m", "1h", "24h"
+        window: "5m"
