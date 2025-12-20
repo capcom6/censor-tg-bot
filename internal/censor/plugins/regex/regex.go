@@ -61,3 +61,8 @@ func (p *Plugin) Evaluate(_ context.Context, msg plugin.Message) (plugin.Result,
 		Plugin:   p.Name(),
 	}, nil
 }
+
+// Cleanup implements plugin.Plugin.
+func (p *Plugin) Cleanup(_ context.Context) {
+	// no-op
+}

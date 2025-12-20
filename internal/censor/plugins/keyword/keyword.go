@@ -71,6 +71,11 @@ func (p *Plugin) Evaluate(_ context.Context, msg plugin.Message) (plugin.Result,
 	}, nil
 }
 
+// Cleanup implements plugin.Plugin.
+func (p *Plugin) Cleanup(_ context.Context) {
+	// no-op
+}
+
 func (p *Plugin) normalizeText(text string) string {
 	if text == "" {
 		return ""
@@ -78,5 +83,3 @@ func (p *Plugin) normalizeText(text string) string {
 	text = p.filter.ReplaceAllString(text, "")
 	return strings.ToLower(text)
 }
-
-var _ plugin.Plugin = (*Plugin)(nil)

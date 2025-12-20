@@ -77,4 +77,7 @@ func (p *Plugin) Evaluate(_ context.Context, msg plugin.Message) (plugin.Result,
 	}, nil
 }
 
-var _ plugin.Plugin = (*Plugin)(nil)
+// Cleanup implements plugin.Plugin.
+func (p *Plugin) Cleanup() {
+	// no-op
+}
