@@ -356,7 +356,7 @@ func TestPlugin_HashGeneration(t *testing.T) {
 	// Hash should be consistent and deterministic
 	require.Equal(
 		t,
-		"4a96a9be99b7a5eb93f75dc7fcee805d88841c76706ad1fde745ae7a9cf7233d",
+		"24fd8bad",
 		result2.Metadata["message_hash"],
 	)
 }

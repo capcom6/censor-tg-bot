@@ -7,6 +7,20 @@ import (
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugin"
 )
 
+func Metadata() plugin.Metadata {
+	return plugin.Metadata{
+		Name: "regex",
+		Factory: func(params map[string]any) (plugin.Plugin, error) {
+			config, err := NewConfig(params)
+			if err != nil {
+				return nil, err
+			}
+
+			return New(config)
+		},
+	}
+}
+
 type Plugin struct {
 	patterns []*regexp.Regexp
 }

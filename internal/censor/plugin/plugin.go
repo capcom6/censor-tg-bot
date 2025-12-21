@@ -35,6 +35,12 @@ type Message struct {
 	ForwardedFromChatID *int64 // Chat ID where original message was sent (if forwarded)
 }
 
+// Metadata contains information about a plugin.
+type Metadata struct {
+	Name    string                                      // Plugin name
+	Factory func(params map[string]any) (Plugin, error) // Factory function
+}
+
 // Plugin is the interface that all censor plugins must implement.
 type Plugin interface {
 	// Name returns the unique identifier for this plugin

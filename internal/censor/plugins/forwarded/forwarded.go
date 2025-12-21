@@ -7,6 +7,20 @@ import (
 	"github.com/samber/lo"
 )
 
+func Metadata() plugin.Metadata {
+	return plugin.Metadata{
+		Name: "forwarded",
+		Factory: func(params map[string]any) (plugin.Plugin, error) {
+			config, err := NewConfig(params)
+			if err != nil {
+				return nil, err
+			}
+
+			return New(config), nil
+		},
+	}
+}
+
 type Plugin struct {
 	config Config
 }
@@ -78,6 +92,6 @@ func (p *Plugin) Evaluate(_ context.Context, msg plugin.Message) (plugin.Result,
 }
 
 // Cleanup implements plugin.Plugin.
-func (p *Plugin) Cleanup() {
+func (p *Plugin) Cleanup(_ context.Context) {
 	// no-op
 }

@@ -5,17 +5,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/capcom6/censor-tg-bot/internal/censor/plugin"
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugins"
-	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/duplicate"
-	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/forwarded"
-	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/keyword"
-	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/ratelimit"
-	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/regex"
 	"github.com/go-core-fx/logger"
 	"go.uber.org/fx"
 )
 
-//nolint:gocognit //will be fixed
 func Module() fx.Option {
 	return fx.Module(
 		"censor",
@@ -26,84 +21,29 @@ func Module() fx.Option {
 
 		// Provide plugins
 		plugins.Module(),
-		fx.Provide(
-			func(config Config) (keyword.Config, error) {
-				configMap := map[string]any{}
-				if v, ok := config.Plugins["keyword"]; ok {
-					configMap = v.Config
-				}
+		fx.Provide(fx.Annotate(
+			func(metadata []plugin.Metadata, config Config) ([]plugin.Plugin, error) {
+				plugins := make([]plugin.Plugin, 0, len(metadata))
+				for _, m := range metadata {
+					configMap := map[string]any{}
+					if v, ok := config.Plugins[m.Name]; ok {
+						configMap = v.Config
+					}
 
-				c, err := keyword.NewConfig(configMap)
-				if err != nil {
-					return c, fmt.Errorf("failed to create keyword config: %w", err)
-				}
+					p, err := m.Factory(configMap)
+					if err != nil {
+						return nil, fmt.Errorf("failed to create plugin %s: %w", m.Name, err)
+					}
 
-				return c, nil
+					plugins = append(plugins, p)
+				}
+				return plugins, nil
 			},
-		),
-		fx.Provide(
-			func(config Config) (regex.Config, error) {
-				configMap := map[string]any{}
-				if v, ok := config.Plugins["regex"]; ok {
-					configMap = v.Config
-				}
-
-				c, err := regex.NewConfig(configMap)
-				if err != nil {
-					return c, fmt.Errorf("failed to create regex config: %w", err)
-				}
-
-				return c, nil
-			},
-		),
-		fx.Provide(
-			func(config Config) (ratelimit.Config, error) {
-				configMap := map[string]any{}
-				if v, ok := config.Plugins["ratelimit"]; ok {
-					configMap = v.Config
-				}
-
-				c, err := ratelimit.NewConfig(configMap)
-				if err != nil {
-					return c, fmt.Errorf("failed to create ratelimit config: %w", err)
-				}
-
-				return c, nil
-			},
-		),
-		fx.Provide(
-			func(config Config) (forwarded.Config, error) {
-				configMap := map[string]any{}
-				if v, ok := config.Plugins["forwarded"]; ok {
-					configMap = v.Config
-				}
-
-				c, err := forwarded.NewConfig(configMap)
-				if err != nil {
-					return c, fmt.Errorf("failed to create forwarded config: %w", err)
-				}
-
-				return c, nil
-			},
-		),
-		fx.Provide(
-			func(config Config) (duplicate.Config, error) {
-				configMap := map[string]any{}
-				if v, ok := config.Plugins["duplicate"]; ok {
-					configMap = v.Config
-				}
-
-				c, err := duplicate.NewConfig(configMap)
-				if err != nil {
-					return c, fmt.Errorf("failed to create duplicate config: %w", err)
-				}
-
-				return c, nil
-			},
-		),
+			fx.ParamTags(`group:"metadata"`),
+		)),
 
 		// Provide service
-		fx.Provide(fx.Annotate(New, fx.ParamTags(`group:"plugins"`))),
+		fx.Provide(New),
 		fx.Invoke(func(svc *Service, lc fx.Lifecycle) {
 			ctx, cancel := context.WithCancel(context.Background())
 			waitCh := make(chan struct{})
