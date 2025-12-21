@@ -147,9 +147,11 @@ func (s *Service) Evaluate(ctx context.Context, msg plugin.Message) plugin.Resul
 
 func (s *Service) Cleanup(ctx context.Context) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
+	plugins := make([]plugin.Plugin, len(s.plugins))
+	copy(plugins, s.plugins)
+	s.mu.RUnlock()
 
-	for _, p := range s.plugins {
+	for _, p := range plugins {
 		p.Cleanup(ctx)
 	}
 }
