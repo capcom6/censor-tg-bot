@@ -15,11 +15,11 @@ func Module() fx.Option {
 		"plugins",
 		logger.WithNamedLogger("plugins"),
 		fx.Provide(
-			fx.Annotate(keyword.New, fx.ResultTags(`group:"plugins"`)),
-			fx.Annotate(ratelimit.New, fx.ResultTags(`group:"plugins"`)),
-			fx.Annotate(regex.New, fx.ResultTags(`group:"plugins"`)),
-			fx.Annotate(forwarded.New, fx.ResultTags(`group:"plugins"`)),
-			fx.Annotate(duplicate.New, fx.ResultTags(`group:"plugins"`)),
+			fx.Annotate(keyword.Metadata, fx.ResultTags(`group:"metadata"`)),
+			fx.Annotate(ratelimit.Metadata, fx.ResultTags(`group:"metadata"`)),
+			fx.Annotate(regex.Metadata, fx.ResultTags(`group:"metadata"`)),
+			fx.Annotate(forwarded.Metadata, fx.ResultTags(`group:"metadata"`)),
+			fx.Annotate(duplicate.Metadata, fx.ResultTags(`group:"metadata"`)),
 		),
 	)
 }

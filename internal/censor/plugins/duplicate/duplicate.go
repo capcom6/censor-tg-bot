@@ -14,6 +14,20 @@ const (
 	minTextLength = 3 // Minimum text length for duplicate detection
 )
 
+func Metadata() plugin.Metadata {
+	return plugin.Metadata{
+		Name: "duplicate",
+		Factory: func(params map[string]any) (plugin.Plugin, error) {
+			config, err := NewConfig(params)
+			if err != nil {
+				return nil, err
+			}
+
+			return New(config), nil
+		},
+	}
+}
+
 type Plugin struct {
 	storage *Storage
 	config  Config
@@ -50,7 +64,10 @@ func (p *Plugin) Evaluate(_ context.Context, msg plugin.Message) (plugin.Result,
 	}
 
 	// Generate message hash for duplicate detection
-	messageHash := p.generateMessageHash(text)
+	messageHash, err := p.generateMessageHash(text)
+	if err != nil {
+		return plugin.Result{}, err
+	}
 
 	// Record duplicate and check if limit exceeded
 	stat := p.storage.Record(
@@ -100,11 +117,13 @@ func (p *Plugin) getMessageText(msg plugin.Message) string {
 }
 
 // generateMessageHash creates a hash for duplicate detection.
-func (p *Plugin) generateMessageHash(text string) string {
+func (p *Plugin) generateMessageHash(text string) (string, error) {
 	// Generate hash based on text content
 	hasher := fnv.New32a()
-	hasher.Write([]byte(text))
-	return hex.EncodeToString(hasher.Sum(nil))
+	if _, err := hasher.Write([]byte(text)); err != nil {
+		return "", fmt.Errorf("failed to generate hash: %w", err)
+	}
+	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
 // Cleanup performs maintenance tasks for the plugin.

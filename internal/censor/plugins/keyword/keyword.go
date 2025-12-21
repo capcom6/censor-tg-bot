@@ -9,6 +9,20 @@ import (
 	"github.com/samber/lo"
 )
 
+func Metadata() plugin.Metadata {
+	return plugin.Metadata{
+		Name: "keyword",
+		Factory: func(params map[string]any) (plugin.Plugin, error) {
+			config, err := NewConfig(params)
+			if err != nil {
+				return nil, err
+			}
+
+			return New(config), nil
+		},
+	}
+}
+
 type Plugin struct {
 	blacklist []string
 	filter    *regexp.Regexp
