@@ -103,7 +103,7 @@ func TestConfig_Validate(t *testing.T) {
 				MaxDuplicates: 0,
 				Window:        5 * time.Minute,
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "negative max_duplicates",

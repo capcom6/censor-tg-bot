@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"hash/fnv"
+	"regexp"
 	"strings"
 
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugin"
@@ -13,6 +14,8 @@ import (
 const (
 	minTextLength = 3 // Minimum text length for duplicate detection
 )
+
+var multiSpaceRegex = regexp.MustCompile(`\s+`)
 
 func Metadata() plugin.Metadata {
 	return plugin.Metadata{
@@ -69,25 +72,29 @@ func (p *Plugin) Evaluate(_ context.Context, msg plugin.Message) (plugin.Result,
 		return plugin.Result{}, err
 	}
 
+	// Calculate max occurrences (original + allowed duplicates)
+	maxOccurrences := p.config.MaxDuplicates + 1
+
 	// Record duplicate and check if limit exceeded
 	stat := p.storage.Record(
 		msg.ChatID,
 		messageHash,
 	)
 
-	if stat.Count > p.config.MaxDuplicates {
+	if stat.Count > maxOccurrences {
 		return plugin.Result{
 			Action: plugin.ActionBlock,
 			Reason: fmt.Sprintf(
-				"duplicate messages exceeded limit (%d in %s)",
-				p.config.MaxDuplicates,
+				"duplicate limit exceeded (%d occurrences, max %d allowed in %s)",
+				stat.Count,
+				maxOccurrences,
 				p.config.Window,
 			),
 			Metadata: map[string]any{
-				"count":          stat.Count,
-				"max_duplicates": p.config.MaxDuplicates,
-				"window":         p.config.Window.String(),
-				"message_hash":   messageHash,
+				"count":           stat.Count,
+				"max_occurrences": maxOccurrences,
+				"window":          p.config.Window.String(),
+				"message_hash":    messageHash,
 			},
 			Plugin: p.Name(),
 		}, nil
@@ -109,11 +116,23 @@ func (p *Plugin) Evaluate(_ context.Context, msg plugin.Message) (plugin.Result,
 func (p *Plugin) getMessageText(msg plugin.Message) string {
 	text := strings.TrimSpace(msg.Text)
 	if text != "" {
-		return text
+		return p.normalizeText(text)
 	}
 
 	// Fallback to caption if text is empty
-	return strings.TrimSpace(msg.Caption)
+	caption := strings.TrimSpace(msg.Caption)
+	if caption != "" {
+		return p.normalizeText(caption)
+	}
+	return ""
+}
+
+func (p *Plugin) normalizeText(text string) string {
+	// Convert to lowercase for case-insensitive matching
+	text = strings.ToLower(text)
+	// Collapse multiple whitespace characters to single space
+	text = multiSpaceRegex.ReplaceAllString(text, " ")
+	return strings.TrimSpace(text)
 }
 
 // generateMessageHash creates a hash for duplicate detection.

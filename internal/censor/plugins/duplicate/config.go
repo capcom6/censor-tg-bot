@@ -58,7 +58,7 @@ func NewConfig(config map[string]any) (Config, error) {
 
 	// Validate the configuration
 	if err := c.Validate(); err != nil {
-		return Config{}, fmt.Errorf("%w: %w", plugin.ErrInvalidConfig, err)
+		return Config{}, err
 	}
 
 	return c, nil
@@ -75,9 +75,9 @@ func DefaultConfig() Config {
 // Validate checks if the configuration values are valid.
 func (c Config) Validate() error {
 	// Check MaxDuplicates
-	if c.MaxDuplicates <= 0 {
+	if c.MaxDuplicates < 0 {
 		return fmt.Errorf(
-			"%w: max_duplicates must be greater than 0, got: %d",
+			"%w: max_duplicates must be >= 0, got: %d",
 			plugin.ErrInvalidConfig,
 			c.MaxDuplicates,
 		)

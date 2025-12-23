@@ -133,10 +133,10 @@ func TestPlugin_Evaluate(t *testing.T) {
 				ChatID: 12345,
 			},
 			expectedAction: plugin.ActionBlock,
-			expectedReason: "duplicate messages exceeded limit (2 in 5m0s)",
+			expectedReason: "duplicate limit exceeded (4 occurrences, max 3 allowed in 5m0s)",
 			setup: func(p *duplicate.Plugin) {
-				// First two calls
-				for range 2 {
+				// First three calls
+				for range 3 {
 					_, err := p.Evaluate(context.Background(), plugin.Message{
 						Text:   "Duplicate message",
 						ChatID: 12345,
@@ -246,7 +246,7 @@ func TestStorage_WindowExpiration(t *testing.T) {
 
 func TestPlugin_UnicodeHandling(t *testing.T) {
 	config := duplicate.Config{
-		MaxDuplicates: 2,
+		MaxDuplicates: 1,
 		Window:        5 * time.Minute,
 	}
 
@@ -356,7 +356,7 @@ func TestPlugin_HashGeneration(t *testing.T) {
 	// Hash should be consistent and deterministic
 	require.Equal(
 		t,
-		"24fd8bad",
+		"95a0db0d",
 		result2.Metadata["message_hash"],
 	)
 }
@@ -374,14 +374,14 @@ func TestPlugin_Integration(t *testing.T) {
 		ChatID: 12345,
 	}
 
-	// First 3 messages should be allowed
-	for range 3 {
+	// First 4 messages should be allowed
+	for range 4 {
 		result, err := p.Evaluate(context.Background(), message)
 		require.NoError(t, err)
 		require.Equal(t, plugin.ActionAllow, result.Action)
 	}
 
-	// Fourth message should be blocked
+	// Fifth message should be blocked
 	result, err := p.Evaluate(context.Background(), message)
 	require.NoError(t, err)
 	require.Equal(t, plugin.ActionBlock, result.Action)
