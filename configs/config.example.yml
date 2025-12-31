@@ -58,3 +58,14 @@ censor:
         # Messages sent within this timeframe are compared for similarity
         # Supported formats: "30s", "5m", "1h", "24h"
         window: "5m"
+
+    llm:
+      enabled: true
+      priority: 250
+      config:
+        api_key: "sk-1234567890"
+        model: nvidia/nemotron-nano-9b-v2:free
+        confidence_threshold: 0.8
+        timeout: 30s
+        prompt: 'Analyze the following message for inappropriate content, spam, or violations. Respond with JSON: {"inappropriate": boolean, "confidence": float, "reason": string}'
+        temperature: 0.1
