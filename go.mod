@@ -1,6 +1,6 @@
 module github.com/capcom6/censor-tg-bot
 
-go 1.24.3
+go 1.25.5
 
 require (
 	github.com/go-core-fx/config v0.1.0
@@ -8,6 +8,7 @@ require (
 	github.com/go-core-fx/logger v0.0.1
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/prometheus/client_golang v1.23.2
+	github.com/revrost/go-openrouter v1.1.5
 	github.com/samber/lo v1.52.0
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/fx v1.24.0
