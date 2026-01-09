@@ -177,6 +177,33 @@ forwarded:
 - Controlling content flow from specific channels/chats
 - Implementing content source restrictions
 
+---
+
+### LLM Plugin
+Blocks messages containing potentially inappropriate content, spam, or violations by analyzing the message with an external large language model (LLM) API.
+
+**Configuration:**
+```yaml
+llm:
+  enabled: true
+  priority: 200
+  config:
+    api_key: ""               # Required API key for LLM service
+    model: "nvidia/nemotron-nano-9b-v2:free"  # LLM model to use
+    confidence_threshold: 0.8 # Threshold for blocking (0.0-1.0)
+    timeout: 30s              # API call timeout
+    prompt: "Analyze the following message for inappropriate content, spam, or violations. Respond with JSON: {\"inappropriate\": boolean, \"confidence\": float, \"reason\": string}"
+    temperature: 0.1          # Temperature for LLM sampling
+```
+
+**Use Cases:**
+- Filtering malicious or phishing attempts via natural language patterns
+- Detecting subtle spam that evades keyword matching
+- Handling context-sensitive content that requires semantic understanding
+- Multi-language message moderation
+
+---
+
 ## Execution Strategies
 
 The censor service supports two execution strategies that determine how plugins process messages:
@@ -344,7 +371,7 @@ Contributions are welcome! Please follow these guidelines:
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Implement your changes with tests
 4. Ensure all tests pass (`go test ./...`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
+5. Commit your changes (`git commit -m 'Add amazing feature'`) 
 6. Push to the branch (`git push origin feature/amazing-feature`)
 7. Open a Pull Request
 
