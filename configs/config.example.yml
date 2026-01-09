@@ -2,6 +2,8 @@ censor:
   strategy: sequential
   timeout: 30s
   enabled_only: true
+  error_action: block
+  skip_action: allow
   plugins:
     keyword:
       enabled: true
