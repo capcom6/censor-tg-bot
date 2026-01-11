@@ -182,6 +182,8 @@ forwarded:
 ### LLM Plugin
 Blocks messages containing potentially inappropriate content, spam, or violations by analyzing the message with an external large language model (LLM) API.
 
+Includes an optional caching feature to reduce LLM API call volume, lower operational costs, and improve response times by storing valid responses for repeated messages (LRU eviction triggers when cache_max_size is exceeded).
+
 **Configuration:**
 ```yaml
 llm:
@@ -194,6 +196,9 @@ llm:
     timeout: 30s              # API call timeout
     prompt: "Analyze the following message for inappropriate content, spam, or violations. Respond with JSON: {\"inappropriate\": boolean, \"confidence\": float, \"reason\": string}"
     temperature: 0.1          # Temperature for LLM sampling
+    cache_enabled: true       # Toggle cache functionality (default: true)
+    cache_ttl: "1h"           # Cache entry TTL (valid range: 1m-24h, default: 1h)
+    cache_max_size: 1000      # Max cached entries (triggers LRU eviction, default: 1000)
 ```
 
 **Use Cases:**

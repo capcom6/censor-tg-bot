@@ -71,3 +71,9 @@ censor:
         timeout: 30s
         prompt: 'Analyze the following message for inappropriate content, spam, or violations. Respond with JSON: {"inappropriate": boolean, "confidence": float, "reason": string}'
         temperature: 0.1
+        # Enable caching for LLM responses to reduce API calls and improve performance
+        cache_enabled: true # default: true
+        # Time to live for cached responses (supported formats: "30s", "5m", "1h")
+        cache_ttl: "1h" # default: "1h"
+        # Maximum number of responses to cache
+        cache_max_size: 1000 # default: 1000
