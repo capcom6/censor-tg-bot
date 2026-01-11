@@ -10,10 +10,16 @@ import (
 	"github.com/revrost/go-openrouter/jsonschema"
 )
 
-type response struct {
+type Response struct {
 	Inappropriate bool    `json:"inappropriate" description:"Whether the message is inappropriate" required:"true"`
 	Confidence    float64 `json:"confidence"    description:"Confidence level of the response"     required:"true"`
 	Reason        string  `json:"reason"        description:"Reason for the response"              required:"true"`
+}
+
+type Cache interface {
+	SetBy(text, model, prompt string, resp *Response)
+	GetBy(text, model, prompt string) (*Response, bool)
+	Cleanup()
 }
 
 func Metadata() plugin.Metadata {
@@ -34,10 +40,11 @@ type Plugin struct {
 	config         Config
 	client         *openrouter.Client
 	responseSchema *jsonschema.Definition
+	cache          Cache // Add cache
 }
 
 func New(config Config) (plugin.Plugin, error) {
-	responseSchema, err := jsonschema.GenerateSchemaForType(new(response))
+	responseSchema, err := jsonschema.GenerateSchemaForType(new(Response))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate response schema: %w", err)
 	}
@@ -50,6 +57,7 @@ func New(config Config) (plugin.Plugin, error) {
 			openrouter.WithHTTPReferer("https://t.me/NeoCensorBot"),
 		),
 		responseSchema: responseSchema,
+		cache:          NewStorage(config.CacheTTL, config.CacheMaxSize),
 	}, nil
 }
 
@@ -80,19 +88,33 @@ func (p *Plugin) Evaluate(ctx context.Context, msg plugin.Message) (plugin.Resul
 	// Prepare message for LLM analysis
 	prompt := p.buildPrompt(text)
 
-	// Call LLM API
+	// Check cache first
+	if p.config.CacheEnabled {
+		if cachedResp, found := p.cache.GetBy(text, p.config.Model, p.config.Prompt); found {
+			result := p.evaluateResponse(cachedResp)
+			result.Metadata["cached"] = true
+			return result, nil
+		}
+	}
+
+	// Cache miss - call API
 	llmResponse, err := p.callLLMAPI(ctx, prompt)
 	if err != nil {
 		return plugin.Result{}, err
 	}
 
-	// Evaluate response and determine action
+	// Store in cache
+	if p.config.CacheEnabled {
+		p.cache.SetBy(text, p.config.Model, p.config.Prompt, llmResponse)
+	}
+
 	result := p.evaluateResponse(llmResponse)
+	result.Metadata["cached"] = false
 
 	return result, nil
 }
 
-func (p *Plugin) evaluateResponse(response *response) plugin.Result {
+func (p *Plugin) evaluateResponse(response *Response) plugin.Result {
 	if response.Inappropriate && response.Confidence >= p.config.ConfidenceThreshold {
 		return plugin.Result{
 			Action: plugin.ActionBlock,
@@ -114,7 +136,7 @@ func (p *Plugin) evaluateResponse(response *response) plugin.Result {
 	}
 }
 
-func (p *Plugin) callLLMAPI(ctx context.Context, prompt string) (*response, error) {
+func (p *Plugin) callLLMAPI(ctx context.Context, prompt string) (*Response, error) {
 	ctx, cancel := context.WithTimeout(ctx, p.config.Timeout)
 	defer cancel()
 
@@ -144,7 +166,7 @@ func (p *Plugin) callLLMAPI(ctx context.Context, prompt string) (*response, erro
 		return nil, fmt.Errorf("%w: expected 1, got %d", ErrUnexpectedResponseCount, len(res.Choices))
 	}
 
-	response := new(response)
+	response := new(Response)
 
 	if jsonErr := json.Unmarshal([]byte(res.Choices[0].Message.Content.Text), response); jsonErr != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", jsonErr)
@@ -164,5 +186,5 @@ func (p *Plugin) buildPrompt(text string) string {
 
 // Cleanup implements plugin.Plugin.
 func (p *Plugin) Cleanup(_ context.Context) {
-	// no-op
+	p.cache.Cleanup()
 }

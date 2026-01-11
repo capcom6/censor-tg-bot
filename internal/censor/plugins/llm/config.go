@@ -17,6 +17,15 @@ const (
 	// DefaultTemperature is the default temperature for the LLM.
 	DefaultTemperature = 0.1
 
+	// DefaultCacheTTL is the default TTL for cached responses.
+	DefaultCacheTTL = 1 * time.Hour
+	// DefaultCacheMaxSize is the default maximum size of the cache.
+	DefaultCacheMaxSize = 1000
+	// MinCacheTTL is the minimum TTL for cached responses.
+	MinCacheTTL = 1 * time.Minute
+	// MaxCacheTTL is the maximum TTL for cached responses.
+	MaxCacheTTL = 24 * time.Hour
+
 	// MinConfidenceThreshold is the minimum confidence threshold.
 	MinConfidenceThreshold = 0.0
 	// MaxConfidenceThreshold is the maximum confidence threshold.
@@ -39,6 +48,9 @@ type Config struct {
 	Timeout             time.Duration // Timeout for API calls
 	Prompt              string        // Custom prompt for the LLM
 	Temperature         float64       // Temperature for the LLM
+	CacheTTL            time.Duration // TTL for cached responses
+	CacheMaxSize        int           // Maximum number of cached responses
+	CacheEnabled        bool          // Whether caching is enabled
 }
 
 // NewConfig creates a new configuration from the provided map.
@@ -57,7 +69,11 @@ func NewConfig(config map[string]any) (Config, error) {
 	}
 
 	// Parse ConfidenceThreshold
-	if c.ConfidenceThreshold, err = plugin.ConfigValue(config, "confidence_threshold", c.ConfidenceThreshold); err != nil {
+	if c.ConfidenceThreshold, err = plugin.ConfigValue(
+		config,
+		"confidence_threshold",
+		c.ConfidenceThreshold,
+	); err != nil {
 		return Config{}, err //nolint:wrapcheck // no need
 	}
 
@@ -81,6 +97,26 @@ func NewConfig(config map[string]any) (Config, error) {
 		return Config{}, err //nolint:wrapcheck // no need
 	}
 
+	// Parse CacheTTL
+	cacheTTLStr, err := plugin.ConfigValue(config, "cache_ttl", c.CacheTTL.String())
+	if err != nil {
+		return Config{}, err //nolint:wrapcheck // no need
+	}
+
+	if c.CacheTTL, err = time.ParseDuration(cacheTTLStr); err != nil {
+		return Config{}, fmt.Errorf("%w: failed to parse cache_ttl: %w", plugin.ErrInvalidConfig, err)
+	}
+
+	// Parse CacheMaxSize
+	if c.CacheMaxSize, err = plugin.ConfigValue(config, "cache_max_size", c.CacheMaxSize); err != nil {
+		return Config{}, err //nolint:wrapcheck // no need
+	}
+
+	// Parse CacheEnabled
+	if c.CacheEnabled, err = plugin.ConfigValue(config, "cache_enabled", c.CacheEnabled); err != nil {
+		return Config{}, err //nolint:wrapcheck // no need
+	}
+
 	// Validate the configuration
 	if validErr := c.Validate(); validErr != nil {
 		return Config{}, validErr
@@ -98,6 +134,9 @@ func DefaultConfig() Config {
 		Model:               DefaultModel,
 		Prompt:              "Analyze the following message for inappropriate content, spam, or violations. Respond with JSON: {\"inappropriate\": boolean, \"confidence\": float, \"reason\": string}",
 		Temperature:         DefaultTemperature,
+		CacheTTL:            DefaultCacheTTL,
+		CacheMaxSize:        DefaultCacheMaxSize,
+		CacheEnabled:        true,
 	}
 }
 
@@ -149,6 +188,26 @@ func (c Config) Validate() error {
 			MinTemperature,
 			MaxTemperature,
 			c.Temperature,
+		)
+	}
+
+	// Check CacheTTL
+	if c.CacheEnabled && (c.CacheTTL < MinCacheTTL || c.CacheTTL > MaxCacheTTL) {
+		return fmt.Errorf(
+			"%w: cache_ttl must be between %s and %s, got: %s",
+			plugin.ErrInvalidConfig,
+			MinCacheTTL,
+			MaxCacheTTL,
+			c.CacheTTL,
+		)
+	}
+
+	// Check CacheMaxSize
+	if c.CacheEnabled && c.CacheMaxSize <= 0 {
+		return fmt.Errorf(
+			"%w: cache_max_size must be positive, got: %d",
+			plugin.ErrInvalidConfig,
+			c.CacheMaxSize,
 		)
 	}
 

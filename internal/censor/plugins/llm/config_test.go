@@ -29,6 +29,10 @@ func TestNewConfig(t *testing.T) {
 				ConfidenceThreshold: llm.DefaultConfidenceThreshold,
 				Timeout:             llm.DefaultTimeout,
 				Temperature:         llm.DefaultTemperature,
+
+				CacheTTL:     llm.DefaultCacheTTL,
+				CacheMaxSize: llm.DefaultCacheMaxSize,
+				CacheEnabled: true,
 			},
 			wantErr: false,
 		},
@@ -49,6 +53,10 @@ func TestNewConfig(t *testing.T) {
 				Timeout:             45 * time.Second,
 				Prompt:              "Custom prompt",
 				Temperature:         0.7,
+
+				CacheTTL:     llm.DefaultCacheTTL,
+				CacheMaxSize: llm.DefaultCacheMaxSize,
+				CacheEnabled: true,
 			},
 			wantErr: false,
 		},
