@@ -80,7 +80,7 @@ func (b *Bot) processMessage(ctx context.Context, bot *tgbotapifx.Bot, message *
 		userToString(message.From),
 		result.Plugin,
 		result.Reason,
-		message.Text,
+		messageToString(message),
 	)
 	if ntfErr := b.notifyAdmins(bot, notification); ntfErr != nil {
 		b.metrics.IncProcessedAction(MetricLabelActionAdminNotified, MetricLabelStatusFailed)
