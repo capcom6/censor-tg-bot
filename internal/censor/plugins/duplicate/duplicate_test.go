@@ -3,7 +3,6 @@ package duplicate_test
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -89,7 +88,7 @@ func TestPlugin_Evaluate(t *testing.T) {
 			expectedReason: "message too short for duplicate detection",
 		},
 		{
-			name: "first occurrence should allow",
+			name: "first occurrence should skip",
 			config: duplicate.Config{
 				MaxDuplicates: 3,
 				Window:        5 * time.Minute,
@@ -98,11 +97,11 @@ func TestPlugin_Evaluate(t *testing.T) {
 				Text:   "Hello world, this is a test message",
 				ChatID: 12345,
 			},
-			expectedAction: plugin.ActionAllow,
+			expectedAction: plugin.ActionSkip,
 			expectedReason: "duplicate limit not exceeded",
 		},
 		{
-			name: "second occurrence should allow",
+			name: "second occurrence should skip",
 			config: duplicate.Config{
 				MaxDuplicates: 3,
 				Window:        5 * time.Minute,
@@ -111,7 +110,7 @@ func TestPlugin_Evaluate(t *testing.T) {
 				Text:   "Hello world, this is a test message",
 				ChatID: 12345,
 			},
-			expectedAction: plugin.ActionAllow,
+			expectedAction: plugin.ActionSkip,
 			expectedReason: "duplicate limit not exceeded",
 			setup: func(p *duplicate.Plugin) {
 				// First call
@@ -155,7 +154,7 @@ func TestPlugin_Evaluate(t *testing.T) {
 				Text:   "Same message",
 				ChatID: 99999,
 			},
-			expectedAction: plugin.ActionAllow,
+			expectedAction: plugin.ActionSkip,
 			expectedReason: "duplicate limit not exceeded",
 		},
 		{
@@ -168,7 +167,7 @@ func TestPlugin_Evaluate(t *testing.T) {
 				Caption: "Caption message",
 				ChatID:  12345,
 			},
-			expectedAction: plugin.ActionAllow,
+			expectedAction: plugin.ActionSkip,
 			expectedReason: "duplicate limit not exceeded",
 		},
 	}
@@ -260,12 +259,12 @@ func TestPlugin_UnicodeHandling(t *testing.T) {
 	// First occurrence
 	result1, err := p.Evaluate(context.Background(), unicodeMessage)
 	require.NoError(t, err)
-	require.Equal(t, plugin.ActionAllow, result1.Action)
+	require.Equal(t, plugin.ActionSkip, result1.Action)
 
 	// Second occurrence
 	result2, err := p.Evaluate(context.Background(), unicodeMessage)
 	require.NoError(t, err)
-	require.Equal(t, plugin.ActionAllow, result2.Action)
+	require.Equal(t, plugin.ActionSkip, result2.Action)
 
 	// Third occurrence - should block
 	result3, err := p.Evaluate(context.Background(), unicodeMessage)
@@ -291,7 +290,7 @@ func TestPlugin_TextExtraction(t *testing.T) {
 				Caption: "This is caption",
 				ChatID:  12345,
 			},
-			expectedAction: plugin.ActionAllow,
+			expectedAction: plugin.ActionSkip,
 		},
 		{
 			name: "caption used when text is empty",
@@ -300,7 +299,7 @@ func TestPlugin_TextExtraction(t *testing.T) {
 				Caption: "This is caption",
 				ChatID:  12345,
 			},
-			expectedAction: plugin.ActionAllow,
+			expectedAction: plugin.ActionSkip,
 		},
 		{
 			name: "whitespace in text trimmed",
@@ -309,7 +308,7 @@ func TestPlugin_TextExtraction(t *testing.T) {
 				Caption: "caption",
 				ChatID:  12345,
 			},
-			expectedAction: plugin.ActionAllow,
+			expectedAction: plugin.ActionSkip,
 		},
 	}
 
@@ -378,7 +377,7 @@ func TestPlugin_Integration(t *testing.T) {
 	for range 4 {
 		result, err := p.Evaluate(context.Background(), message)
 		require.NoError(t, err)
-		require.Equal(t, plugin.ActionAllow, result.Action)
+		require.Equal(t, plugin.ActionSkip, result.Action)
 	}
 
 	// Fifth message should be blocked
@@ -392,7 +391,7 @@ func TestPlugin_Integration(t *testing.T) {
 	// Should allow again after window expires
 	result, err = p.Evaluate(context.Background(), message)
 	require.NoError(t, err)
-	require.Equal(t, plugin.ActionAllow, result.Action)
+	require.Equal(t, plugin.ActionSkip, result.Action)
 }
 
 func TestPlugin_NilConfig(t *testing.T) {
@@ -480,15 +479,7 @@ func TestPlugin_EmptyMessageHandling(t *testing.T) {
 			result, err := p.Evaluate(context.Background(), tt.message)
 			require.NoError(t, err)
 
-			// Determine expected action based on the reason
-			var expectedAction plugin.Action
-			if strings.Contains(tt.reason, "too short") {
-				expectedAction = plugin.ActionSkip
-			} else {
-				expectedAction = plugin.ActionAllow
-			}
-
-			require.Equal(t, expectedAction, result.Action)
+			require.Equal(t, plugin.ActionSkip, result.Action)
 			require.Equal(t, tt.reason, result.Reason)
 		})
 	}

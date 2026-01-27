@@ -16,7 +16,7 @@ import (
 type ExecutionStrategy string
 
 const (
-	StrategySequential ExecutionStrategy = "sequential" // execute plugins in priority order, stop on first Block
+	StrategySequential ExecutionStrategy = "sequential" // execute plugins in priority order, Allow takes precedence over Block
 	StrategyParallel   ExecutionStrategy = "parallel"   // execute all plugins concurrently, aggregate results
 )
 
@@ -164,13 +164,13 @@ func (s *Service) getPluginPriority(p plugin.Plugin) int {
 	return p.Priority()
 }
 
-// evaluateSequential executes plugins in priority order, stopping on first block.
+// evaluateSequential executes plugins in priority order.
 func (s *Service) evaluateSequential(
 	ctx context.Context,
 	msg plugin.Message,
 	plugins []plugin.Plugin,
 ) (plugin.Result, error) {
-	hasAllow := false
+	var block *plugin.Result
 
 	for _, p := range plugins {
 		select {
@@ -200,23 +200,18 @@ func (s *Service) evaluateSequential(
 				zap.String("plugin", p.Name()),
 				zap.String("reason", result.Reason),
 			)
-			return result, nil
+			// Block is not final - continue to see if any plugin explicitly allows
+			block = &result
 		case plugin.ActionAllow:
-			// In sequential mode, allow is not final - continue to next plugin
 			s.logger.Debug("plugin allowed message", zap.String("plugin", p.Name()))
-			hasAllow = true
+			return result, nil
 		case plugin.ActionSkip:
 			s.logger.Debug("plugin skipped message", zap.String("plugin", p.Name()))
 		}
 	}
 
-	if hasAllow {
-		return plugin.Result{
-			Action:   plugin.ActionAllow,
-			Reason:   "all plugins passed",
-			Metadata: nil,
-			Plugin:   "manager",
-		}, nil
+	if block != nil {
+		return *block, nil
 	}
 
 	return plugin.Result{
@@ -281,7 +276,7 @@ func (s *Service) evaluateParallel(
 	}
 
 	// Aggregate results
-	hasAllow := false
+	var block *plugin.Result
 	for _, r := range allResults {
 		if r.err != nil {
 			s.logger.Error("plugin evaluation error",
@@ -291,27 +286,23 @@ func (s *Service) evaluateParallel(
 			return plugin.Result{}, fmt.Errorf("%w: %s", ErrPluginError, r.plugin.Name())
 		}
 
+		if r.result.Action == plugin.ActionAllow {
+			s.logger.Debug("plugin allowed message", zap.String("plugin", r.plugin.Name()))
+			return r.result, nil
+		}
+
 		if r.result.Action == plugin.ActionBlock {
 			s.logger.Debug("plugin blocked message",
 				zap.String("plugin", r.plugin.Name()),
 				zap.String("reason", r.result.Reason),
 			)
-			return r.result, nil
-		}
 
-		if r.result.Action == plugin.ActionAllow {
-			s.logger.Debug("plugin allowed message", zap.String("plugin", r.plugin.Name()))
-			hasAllow = true
+			block = &r.result
 		}
 	}
 
-	if hasAllow {
-		return plugin.Result{
-			Action:   plugin.ActionAllow,
-			Reason:   "at least one plugin allowed, none blocked",
-			Metadata: nil,
-			Plugin:   "manager",
-		}, nil
+	if block != nil {
+		return *block, nil
 	}
 
 	return plugin.Result{
