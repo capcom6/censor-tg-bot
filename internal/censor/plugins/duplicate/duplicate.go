@@ -100,9 +100,9 @@ func (p *Plugin) Evaluate(_ context.Context, msg plugin.Message) (plugin.Result,
 		}, nil
 	}
 
-	// Within limits, allow the message
+	// Within limits, skip to let other plugins decide
 	return plugin.Result{
-		Action: plugin.ActionAllow,
+		Action: plugin.ActionSkip,
 		Reason: "duplicate limit not exceeded",
 		Metadata: map[string]any{
 			"message_hash": messageHash,
