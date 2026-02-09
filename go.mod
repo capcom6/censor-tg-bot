@@ -27,7 +27,7 @@ require (
 	github.com/go-core-fx/fxutil v0.0.0-20251027105421-acea37162eb9 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/gofiber/contrib/fiberzap/v2 v2.1.6 // indirect
-	github.com/gofiber/fiber/v2 v2.52.10 // indirect
+	github.com/gofiber/fiber/v2 v2.52.11 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/klauspost/compress v1.18.2 // indirect
