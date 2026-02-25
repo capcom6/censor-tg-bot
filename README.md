@@ -209,6 +209,31 @@ llm:
 
 ---
 
+### Users Plugin
+Blocks or allows messages based on user IDs using a blacklist/whitelist approach. Whitelisted users are always allowed, blacklisted users are always blocked, and users not in either list are skipped.
+
+**Configuration:**
+```yaml
+users:
+  enabled: true
+  priority: 5   # Execute early for user-based filtering
+  config:
+    blacklist:
+      - 123456789    # Block specific user IDs
+      - 987654321
+    whitelist:
+      - 111111111    # Allow specific user IDs (overrides blacklist)
+      - 222222222
+```
+
+**Use Cases:**
+- Blocking known spammers or abusive users
+- Allowing trusted users to bypass other filters
+- Implementing user-based access control
+- Creating VIP user lists with special treatment
+
+---
+
 ## Execution Strategies
 
 The censor service supports two execution strategies that determine how plugins process messages:

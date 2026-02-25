@@ -7,6 +7,7 @@ import (
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/llm"
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/ratelimit"
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/regex"
+	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/users"
 	"github.com/go-core-fx/logger"
 	"go.uber.org/fx"
 )
@@ -22,6 +23,7 @@ func Module() fx.Option {
 			fx.Annotate(forwarded.Metadata, fx.ResultTags(`group:"metadata"`)),
 			fx.Annotate(duplicate.Metadata, fx.ResultTags(`group:"metadata"`)),
 			fx.Annotate(llm.Metadata, fx.ResultTags(`group:"metadata"`)),
+			fx.Annotate(users.Metadata, fx.ResultTags(`group:"metadata"`)),
 		),
 	)
 }

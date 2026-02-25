@@ -5,35 +5,20 @@ censor:
   error_action: block
   skip_action: allow
   plugins:
-    keyword:
-      enabled: true
-      priority: 10
-      config:
-        blacklist:
-          - spam
-          - scam
-          - phishing
-
-    ratelimit:
+    # Users plugin - provides simple user-based access control
+    # Blacklists users (blocked) and whitelists users (explicitly allowed)
+    users:
       enabled: true
       priority: 5
       config:
-        max_messages: 5
-        window: "1m"
-
-    regex:
-      enabled: true
-      priority: 20
-      config:
-        patterns:
-          - '(?i)https?://[\w\-\.]+\.xyz' # Block .xyz domains
-          - '\b\d{16}\b' # Block credit card numbers
+        blacklist: []
+        whitelist: []
 
     # Forwarded messages restriction plugin
     # Blocks or allows forwarded messages based on source
     forwarded:
       enabled: true
-      priority: 15
+      priority: 10
       config:
         # Optional: List of user IDs whose messages can be forwarded
         # allowed_user_ids:
@@ -44,6 +29,30 @@ censor:
         # allowed_chat_ids:
         #   - -1001234567890  # Official channel ID (negative for supergroups/channels)
         #   - -1000987654321  # Another allowed chat
+
+    ratelimit:
+      enabled: true
+      priority: 15
+      config:
+        max_messages: 5
+        window: "1m"
+
+    keyword:
+      enabled: true
+      priority: 20
+      config:
+        blacklist:
+          - spam
+          - scam
+          - phishing
+
+    regex:
+      enabled: true
+      priority: 25
+      config:
+        patterns:
+          - '(?i)https?://[\w\-\.]+\.xyz' # Block .xyz domains
+          - '\b\d{16}\b' # Block credit card numbers
 
     # Duplicate plugin - detects and blocks repetitive messages from users
     # This plugin tracks identical or very similar messages within a time window

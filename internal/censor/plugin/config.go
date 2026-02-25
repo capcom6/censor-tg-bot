@@ -31,9 +31,13 @@ func SliceFromAnyOrDefault[T any](params map[string]any, key string, defaultValu
 		return nil, fmt.Errorf("%w: %s must be a slice", ErrInvalidConfig, key)
 	}
 
+	if len(vSlice) == 0 {
+		return make([]T, 0), nil
+	}
+
 	vTyped, ok := lo.FromAnySlice[T](vSlice)
 	if !ok {
-		return nil, fmt.Errorf("%w: invalid type of items in %s", ErrInvalidConfig, key)
+		return nil, fmt.Errorf("%w: invalid type of items in %s: %T", ErrInvalidConfig, key, vSlice[0])
 	}
 
 	return vTyped, nil
