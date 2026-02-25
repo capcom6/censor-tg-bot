@@ -42,7 +42,7 @@ const (
 
 // Config represents the configuration for the LLM plugin.
 type Config struct {
-	APIKey              string        // API key for the LLM service
+	APIKey              string        `json:"-"` // API key for the LLM service
 	Model               string        // LLM model to use
 	ConfidenceThreshold float64       // Confidence threshold for blocking (0.0 - 1.0)
 	Timeout             time.Duration // Timeout for API calls

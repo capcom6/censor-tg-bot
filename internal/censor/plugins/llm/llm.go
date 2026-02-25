@@ -184,7 +184,6 @@ func (p *Plugin) buildPrompt(text string) string {
 	return fmt.Sprintf("%s\n\nMessage to analyze:\n%q", p.config.Prompt, text)
 }
 
-// Cleanup implements plugin.Plugin.
 func (p *Plugin) Cleanup(_ context.Context) {
 	p.cache.Cleanup()
 }

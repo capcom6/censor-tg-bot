@@ -9,8 +9,8 @@ import (
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugin"
 	"github.com/capcom6/censor-tg-bot/internal/storage"
 	"github.com/capcom6/censor-tg-bot/pkg/tgbotapifx"
-	"github.com/capcom6/censor-tg-bot/pkg/utils/slices"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/samber/lo"
 	"go.uber.org/zap"
 )
 
@@ -35,13 +35,13 @@ func New(cfg Config, censor *censor.Service, storage *storage.Storage, metrics *
 }
 
 func (b *Bot) Handler(ctx context.Context, bot *tgbotapifx.Bot, update tgbotapi.Update) error {
-	message := slices.FirstNotZero(
+	message, ok := lo.Find([]*tgbotapi.Message{
 		update.Message,
 		update.EditedMessage,
 		update.ChannelPost,
 		update.EditedChannelPost,
-	)
-	if message == nil {
+	}, lo.IsNotEmpty)
+	if !ok {
 		return nil
 	}
 
