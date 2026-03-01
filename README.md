@@ -240,39 +240,43 @@ The censor service supports two execution strategies that determine how plugins 
 
 ### Sequential (Default)
 
-Plugins execute in priority order (lower priority number = earlier execution), stopping at the first block decision.
+Plugins execute in priority order (lower priority number = earlier execution), with allow decisions taking precedence over block decisions.
 
 **Best for:** Most use cases, efficient resource usage
 
 **Behavior:**
 
 - Plugins are sorted by priority
-- Execution stops when the first plugin returns `ActionBlock`
-- Subsequent plugins are skipped after a block decision
-- Ideal for short-circuiting expensive operations
+- Each plugin is executed sequentially
+- If a plugin returns `ActionAllow`, execution stops and the message is allowed
+- If a plugin returns `ActionBlock`, execution continues to check remaining plugins for a possible `ActionAllow`
+- If all plugins return `ActionSkip` or a mix of `ActionBlock` without any `ActionAllow`, the last `ActionBlock` (if any) or the configured skip action is applied
+- Ideal for early exit when an allow is found, reducing unnecessary plugin evaluations
 
 ```yaml
 censor:
   strategy: sequential
 ```
-
 ### Parallel
 
-All plugins execute concurrently, with results aggregated after all complete.
+All plugins execute concurrently, with results aggregated. Allow decisions take precedence over block decisions.
 
 **Best for:** When all plugins must evaluate every message, high-performance scenarios
 
 **Behavior:**
 
 - All enabled plugins run simultaneously
-- Results are collected and aggregated
-- A block decision from any plugin results in message blocking
+- Results are collected from all plugins
+- If any plugin returns `ActionAllow`, the message is allowed (first allow wins)
+- If no allow is found but any plugin returns `ActionBlock`, the message is blocked (last block wins)
+- If all plugins return `ActionSkip`, the configured skip action is applied
 - Better throughput but higher resource usage
 
 ```yaml
 censor:
   strategy: parallel
 ```
+
 
 ## Running
 
