@@ -11,6 +11,9 @@ type (
 )
 
 const (
+	metricsNamespace = "censor"
+	metricsSubsystem = "bot"
+
 	MetricLabelActionMessageProcessed MetricLabelAction = "message_processed"
 	MetricLabelActionMessageDeleted   MetricLabelAction = "message_deleted"
 	MetricLabelActionUserBanned       MetricLabelAction = "user_banned"
@@ -27,7 +30,8 @@ type Metrics struct {
 func NewMetrics() *Metrics {
 	return &Metrics{
 		processedActionsTotal: promauto.NewCounterVec(prometheus.CounterOpts{
-			Subsystem: "bot",
+			Namespace: metricsNamespace,
+			Subsystem: metricsSubsystem,
 			Name:      "processed_actions_total",
 			Help:      "Total number of bot actions performed",
 		}, []string{"action", "status"}),

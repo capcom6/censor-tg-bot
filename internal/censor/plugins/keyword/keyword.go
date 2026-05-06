@@ -9,9 +9,13 @@ import (
 	"github.com/samber/lo"
 )
 
+const (
+	pluginName = "keyword"
+)
+
 func Metadata() plugin.Metadata {
 	return plugin.Metadata{
-		Name: "keyword",
+		Name: pluginName,
 		Factory: func(params map[string]any) (plugin.Plugin, error) {
 			config, err := NewConfig(params)
 			if err != nil {
@@ -41,7 +45,7 @@ func New(config Config) plugin.Plugin {
 }
 
 func (p *Plugin) Name() string {
-	return "keyword"
+	return pluginName
 }
 
 func (p *Plugin) Priority() int {

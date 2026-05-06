@@ -1,237 +1,306 @@
 {
     "dashboard": {
-        "id": null,
-        "title": "Censor Telegram Bot Metrics",
+        "annotations": {
+            "list": []
+        },
         "description": "Dashboard for monitoring Censor Telegram Bot metrics including bot actions, censor results, and HTTP server metrics",
-        "timezone": "browser",
-        "schemaVersion": 39,
-        "version": 1,
-        "refresh": "30s",
+        "id": null,
+        "links": [],
         "panels": [
             {
-                "type": "graph",
-                "title": "Bot Actions Over Time",
-                "id": 1,
+                "datasource": "Prometheus",
                 "gridPos": {
                     "h": 8,
                     "w": 12,
                     "x": 0,
                     "y": 0
                 },
+                "id": 1,
                 "targets": [
                     {
-                        "expr": "rate(bot_processed_actions_total[5m])",
+                        "expr": "rate(censor_bot_processed_actions_total[5m])",
                         "legendFormat": "{{action}} - {{status}}"
                     }
                 ],
-                "datasource": "Prometheus"
+                "title": "Bot Actions Over Time",
+                "type": "graph"
             },
             {
-                "type": "stat",
-                "title": "Total Bot Actions",
-                "id": 2,
+                "datasource": "Prometheus",
                 "gridPos": {
                     "h": 4,
                     "w": 6,
                     "x": 12,
                     "y": 0
                 },
+                "id": 2,
                 "targets": [
                     {
-                        "expr": "sum(bot_processed_actions_total)",
+                        "expr": "sum(censor_bot_processed_actions_total)",
                         "stat": "total"
                     }
                 ],
-                "datasource": "Prometheus"
+                "title": "Total Bot Actions",
+                "type": "stat"
             },
             {
-                "type": "piechart",
-                "title": "Bot Action Distribution",
-                "id": 3,
+                "datasource": "Prometheus",
                 "gridPos": {
                     "h": 8,
                     "w": 6,
                     "x": 18,
                     "y": 0
                 },
+                "id": 3,
                 "targets": [
                     {
-                        "expr": "bot_processed_actions_total",
+                        "expr": "censor_bot_processed_actions_total",
                         "legendFormat": "{{action}} ({{status}})"
                     }
                 ],
-                "datasource": "Prometheus"
+                "title": "Bot Action Distribution",
+                "type": "piechart"
             },
             {
-                "type": "graph",
-                "title": "Censor Plugin Evaluation Over Time",
-                "id": 4,
+                "datasource": "Prometheus",
                 "gridPos": {
                     "h": 8,
                     "w": 12,
                     "x": 0,
                     "y": 8
                 },
+                "id": 4,
                 "targets": [
                     {
                         "expr": "rate(censor_plugin_evaluations_total[5m])",
                         "legendFormat": "{{plugin}} - {{action}}"
                     }
                 ],
-                "datasource": "Prometheus"
+                "title": "Censor Plugin Evaluation Over Time",
+                "type": "graph"
             },
             {
-                "type": "stat",
-                "title": "Total Plugin Evaluations",
-                "id": 5,
+                "datasource": "Prometheus",
                 "gridPos": {
                     "h": 4,
                     "w": 6,
                     "x": 12,
                     "y": 8
                 },
+                "id": 5,
                 "targets": [
                     {
                         "expr": "sum(censor_plugin_evaluations_total)",
                         "stat": "total"
                     }
                 ],
-                "datasource": "Prometheus"
+                "title": "Total Plugin Evaluations",
+                "type": "stat"
             },
             {
-                "type": "piechart",
-                "title": "Plugin Evaluation Distribution",
-                "id": 6,
+                "datasource": "Prometheus",
                 "gridPos": {
                     "h": 8,
                     "w": 6,
                     "x": 18,
                     "y": 8
                 },
+                "id": 6,
                 "targets": [
                     {
                         "expr": "censor_plugin_evaluations_total",
                         "legendFormat": "{{plugin}} ({{action}})"
                     }
                 ],
-                "datasource": "Prometheus"
+                "title": "Plugin Evaluation Distribution",
+                "type": "piechart"
             },
             {
-                "type": "graph",
-                "title": "Plugin Evaluation Duration",
-                "id": 7,
+                "datasource": "Prometheus",
                 "gridPos": {
                     "h": 8,
                     "w": 12,
                     "x": 0,
                     "y": 16
                 },
+                "id": 13,
+                "targets": [
+                    {
+                        "expr": "rate(censor_plugin_errors_total[5m])",
+                        "legendFormat": "{{plugin}}"
+                    }
+                ],
+                "title": "Plugin Errors Over Time",
+                "type": "graph"
+            },
+            {
+                "datasource": "Prometheus",
+                "gridPos": {
+                    "h": 4,
+                    "w": 6,
+                    "x": 12,
+                    "y": 16
+                },
+                "id": 14,
+                "targets": [
+                    {
+                        "expr": "sum(censor_plugin_errors_total)",
+                        "stat": "total"
+                    }
+                ],
+                "title": "Total Plugin Errors",
+                "type": "stat"
+            },
+            {
+                "datasource": "Prometheus",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 28
+                },
+                "id": 7,
                 "targets": [
                     {
                         "expr": "histogram_quantile(0.95, rate(censor_plugin_duration_seconds_bucket[5m]))",
                         "legendFormat": "{{plugin}} p95"
                     }
                 ],
-                "datasource": "Prometheus"
+                "title": "Plugin Evaluation Duration",
+                "type": "graph"
             },
             {
-                "type": "stat",
-                "title": "95th Percentile Plugin Duration",
-                "id": 8,
+                "datasource": "Prometheus",
                 "gridPos": {
                     "h": 4,
                     "w": 6,
                     "x": 12,
-                    "y": 16
+                    "y": 28
                 },
+                "id": 8,
                 "targets": [
                     {
                         "expr": "histogram_quantile(0.95, rate(censor_plugin_duration_seconds_bucket[5m]))",
                         "stat": "max"
                     }
                 ],
-                "datasource": "Prometheus"
+                "title": "95th Percentile Plugin Duration",
+                "type": "stat"
             },
             {
-                "type": "graph",
-                "title": "HTTP Request Rate",
-                "id": 9,
+                "datasource": "Prometheus",
                 "gridPos": {
                     "h": 8,
                     "w": 12,
                     "x": 0,
-                    "y": 24
+                    "y": 36
                 },
+                "id": 15,
+                "targets": [
+                    {
+                        "expr": "rate(censor_evaluations_total[5m])",
+                        "legendFormat": "{{result}}"
+                    }
+                ],
+                "title": "Message Evaluation Results",
+                "type": "graph"
+            },
+            {
+                "datasource": "Prometheus",
+                "gridPos": {
+                    "h": 4,
+                    "w": 6,
+                    "x": 12,
+                    "y": 36
+                },
+                "id": 16,
+                "targets": [
+                    {
+                        "expr": "sum(censor_evaluations_total{result=\"block\"})",
+                        "stat": "total"
+                    }
+                ],
+                "title": "Total Blocked Messages",
+                "type": "stat"
+            },
+            {
+                "datasource": "Prometheus",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 44
+                },
+                "id": 9,
                 "targets": [
                     {
                         "expr": "rate(http_requests_total[5m])",
                         "legendFormat": "{{method}} {{path}} {{status}}"
                     }
                 ],
-                "datasource": "Prometheus"
+                "title": "HTTP Request Rate",
+                "type": "graph"
             },
             {
-                "type": "stat",
-                "title": "Total HTTP Requests",
-                "id": 10,
+                "datasource": "Prometheus",
                 "gridPos": {
                     "h": 4,
                     "w": 6,
                     "x": 12,
-                    "y": 24
+                    "y": 44
                 },
+                "id": 10,
                 "targets": [
                     {
                         "expr": "sum(http_requests_total)",
                         "stat": "total"
                     }
                 ],
-                "datasource": "Prometheus"
+                "title": "Total HTTP Requests",
+                "type": "stat"
             },
             {
-                "type": "graph",
-                "title": "HTTP Request Duration",
-                "id": 11,
+                "datasource": "Prometheus",
                 "gridPos": {
                     "h": 8,
                     "w": 12,
                     "x": 0,
-                    "y": 32
+                    "y": 52
                 },
+                "id": 11,
                 "targets": [
                     {
                         "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
                         "legendFormat": "{{method}} {{path}} p95"
                     }
                 ],
-                "datasource": "Prometheus"
+                "title": "HTTP Request Duration",
+                "type": "graph"
             },
             {
-                "type": "stat",
-                "title": "95th Percentile Request Duration",
-                "id": 12,
+                "datasource": "Prometheus",
                 "gridPos": {
                     "h": 4,
                     "w": 6,
                     "x": 12,
-                    "y": 32
+                    "y": 52
                 },
+                "id": 12,
                 "targets": [
                     {
                         "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
                         "stat": "max"
                     }
                 ],
-                "datasource": "Prometheus"
+                "title": "95th Percentile Request Duration",
+                "type": "stat"
             }
         ],
+        "refresh": "30s",
+        "schemaVersion": 39,
         "templating": {
             "list": []
         },
-        "annotations": {
-            "list": []
-        },
-        "links": [],
         "time": {
             "from": "now-6h",
             "to": "now"
@@ -260,6 +329,9 @@
                 "7d",
                 "30d"
             ]
-        }
+        },
+        "timezone": "browser",
+        "title": "Censor Telegram Bot Metrics",
+        "version": 1
     }
 }
