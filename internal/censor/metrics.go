@@ -8,6 +8,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
+const (
+	metricsNamespace = "censor"
+	metricsSubsystem = "plugin"
+
+	metricsLabelPlugin = "plugin"
+)
+
 type Metrics struct {
 	pluginEvaluations *prometheus.CounterVec   // Labels: plugin, action (allow|block|skip)
 	pluginDuration    *prometheus.HistogramVec // Labels: plugin
@@ -18,26 +25,30 @@ type Metrics struct {
 func NewMetrics() *Metrics {
 	return &Metrics{
 		pluginEvaluations: promauto.NewCounterVec(prometheus.CounterOpts{
-			Subsystem: "censor",
-			Name:      "plugin_evaluations_total",
+			Namespace: metricsNamespace,
+			Subsystem: metricsSubsystem,
+			Name:      "evaluations_total",
 			Help:      "Total number of plugin evaluations, labeled by plugin name and action",
-		}, []string{"plugin", "action"}),
+		}, []string{metricsLabelPlugin, "action"}),
 
 		pluginDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
-			Subsystem: "censor",
-			Name:      "plugin_duration_seconds",
+			Namespace: metricsNamespace,
+			Subsystem: metricsSubsystem,
+			Name:      "duration_seconds",
 			Help:      "Histogram of plugin evaluation durations",
 			Buckets:   []float64{1e-6, 1e-5, 1e-4, 0.001, 0.01, 0.1, 1, 10},
-		}, []string{"plugin"}),
+		}, []string{metricsLabelPlugin}),
 
 		pluginErrors: promauto.NewCounterVec(prometheus.CounterOpts{
-			Subsystem: "censor",
-			Name:      "plugin_errors_total",
+			Namespace: metricsNamespace,
+			Subsystem: metricsSubsystem,
+			Name:      "errors_total",
 			Help:      "Total number of plugin evaluation errors",
-		}, []string{"plugin"}),
+		}, []string{metricsLabelPlugin}),
 
 		totalEvaluations: promauto.NewCounterVec(prometheus.CounterOpts{
-			Subsystem: "censor",
+			Namespace: metricsNamespace,
+			Subsystem: metricsSubsystem,
 			Name:      "evaluations_total",
 			Help:      "Total number of message evaluations, labeled by result",
 		}, []string{"result"}),

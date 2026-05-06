@@ -3,7 +3,7 @@ groups:
     rules:
       # Bot Alerts
       - alert: HighBotActionFailureRate
-        expr: rate(bot_processed_actions_total{status="failed"}[5m]) / rate(bot_processed_actions_total[5m]) > 0.1
+        expr: rate(censor_bot_processed_actions_total{status="failed"}[5m]) / rate(censor_bot_processed_actions_total[5m]) > 0.1
         for: 5m
         labels:
           severity: warning
@@ -12,7 +12,7 @@ groups:
           description: "More than 10% of bot actions are failing\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
       - alert: BotActionFailures
-        expr: increase(bot_processed_actions_total{status="failed"}[5m]) > 5
+        expr: increase(censor_bot_processed_actions_total{status="failed"}[5m]) > 5
         for: 2m
         labels:
           severity: critical

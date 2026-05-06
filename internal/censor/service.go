@@ -16,6 +16,8 @@ import (
 type ExecutionStrategy string
 
 const (
+	pluginName = "manager"
+
 	StrategySequential ExecutionStrategy = "sequential" // execute plugins in priority order, Allow takes precedence over Block
 	StrategyParallel   ExecutionStrategy = "parallel"   // execute all plugins concurrently, aggregate results
 )
@@ -113,7 +115,7 @@ func (s *Service) Evaluate(ctx context.Context, msg plugin.Message) plugin.Resul
 			Action:   s.config.SkipAction,
 			Reason:   "no plugins registered",
 			Metadata: nil,
-			Plugin:   "manager",
+			Plugin:   pluginName,
 		}
 	}
 
@@ -134,10 +136,10 @@ func (s *Service) Evaluate(ctx context.Context, msg plugin.Message) plugin.Resul
 	if err != nil {
 		result.Action = s.config.ErrorAction
 		result.Reason = err.Error()
-		result.Plugin = "manager"
+		result.Plugin = pluginName
 	} else if result.Action == plugin.ActionSkip {
 		result.Action = s.config.SkipAction
-		result.Plugin = "manager"
+		result.Plugin = pluginName
 	}
 
 	s.metrics.RecordTotalEvaluation(result)
@@ -218,7 +220,7 @@ func (s *Service) evaluateSequential(
 		Action:   plugin.ActionSkip,
 		Reason:   "all plugins skipped",
 		Metadata: nil,
-		Plugin:   "manager",
+		Plugin:   pluginName,
 	}, nil
 }
 
@@ -309,6 +311,6 @@ func (s *Service) evaluateParallel(
 		Action:   plugin.ActionSkip,
 		Reason:   "all plugins skipped",
 		Metadata: nil,
-		Plugin:   "manager",
+		Plugin:   pluginName,
 	}, nil
 }
