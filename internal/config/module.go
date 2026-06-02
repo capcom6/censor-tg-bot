@@ -22,6 +22,7 @@ func Module() fx.Option {
 				Token:           cfg.Telegram.Token,
 				LongPollTimeout: time.Minute,
 				Debug:           os.Getenv("DEBUG") != "",
+				ProxyURL:        cfg.Telegram.ProxyURL,
 			}
 		}),
 		fx.Provide(func(cfg Config) bot.Config {
