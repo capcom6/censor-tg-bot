@@ -16,7 +16,8 @@ type Bot struct {
 }
 
 type telegram struct {
-	Token string `koanf:"token"`
+	Token    string `koanf:"token"`
+	ProxyURL string `koanf:"proxy_url"`
 }
 
 type plugin struct {

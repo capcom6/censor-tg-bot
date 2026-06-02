@@ -1,3 +1,6 @@
+telegram:
+  proxy_url: "socks5://user:pass@127.0.0.1:1080" # optional SOCKS5 proxy
+
 censor:
   strategy: sequential
   timeout: 30s

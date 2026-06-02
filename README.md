@@ -33,6 +33,7 @@ The app uses environment variables or a configuration file. Create a `.env` file
 TELEGRAM__TOKEN=xxx:yyyyy              # Bot token from @BotFather
 BOT__ADMIN_ID=123456789                # Your Telegram user ID
 BOT__BAN_THRESHOLD=3                   # Number of violations before ban
+TELEGRAM__PROXY_URL=socks5://user:pass@127.0.0.1:1080   # Optional SOCKS5 proxy
 
 # Censor Settings
 CENSOR__STRATEGY=sequential            # sequential|parallel
@@ -59,6 +60,9 @@ CENSOR__BLACKLIST='spam,scam,phishing' # Comma-separated blacklist
 Create a `config.yml` file:
 
 ```yaml
+telegram:
+  proxy_url: "socks5://user:pass@127.0.0.1:1080" # optional SOCKS5 proxy
+
 censor:
   strategy: sequential
   timeout: 30s
@@ -396,6 +400,15 @@ The plugin architecture allows you to create custom filtering logic by implement
 - Check bot has admin permissions in the chat
 - Review logs for connection errors
 - Ensure firewall allows outbound HTTPS
+
+### Proxy Connection Errors
+**Symptom:** Bot fails to connect to Telegram API when proxy is configured
+
+**Solution:**
+- Verify `TELEGRAM__PROXY_URL` URL format: `socks5://user:pass@host:port`
+- Ensure the SOCKS5 proxy server is reachable from the bot's network
+- Check proxy credentials if authentication is required
+- Review logs for connection refused or timeout errors
 
 ## Contributing
 
