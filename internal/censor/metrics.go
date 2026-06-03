@@ -48,7 +48,7 @@ func NewMetrics() *Metrics {
 
 		totalEvaluations: promauto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: metricsNamespace,
-			Subsystem: metricsSubsystem,
+			Subsystem: "",
 			Name:      "evaluations_total",
 			Help:      "Total number of message evaluations, labeled by result",
 		}, []string{"result"}),
