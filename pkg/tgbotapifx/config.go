@@ -7,4 +7,5 @@ type Config struct {
 	LongPollTimeout time.Duration
 	Debug           bool
 	ProxyURL        string
+	Timeout         time.Duration
 }
