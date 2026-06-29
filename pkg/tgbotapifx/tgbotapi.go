@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"go.uber.org/zap"
@@ -26,22 +27,14 @@ type Bot struct {
 func New(config Config, logger *zap.Logger) (*Bot, error) {
 	var api *tgbotapi.BotAPI
 
-	if config.ProxyURL != "" {
-		client, err := newProxyClient(config.ProxyURL)
-		if err != nil {
-			return nil, err
-		}
+	client, err := newClient(config.ProxyURL, config.Timeout)
+	if err != nil {
+		return nil, err
+	}
 
-		api, err = tgbotapi.NewBotAPIWithClient(config.Token, tgbotapi.APIEndpoint, client)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create bot: %w", err)
-		}
-	} else {
-		var err error
-		api, err = tgbotapi.NewBotAPI(config.Token)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create bot: %w", err)
-		}
+	api, err = tgbotapi.NewBotAPIWithClient(config.Token, tgbotapi.APIEndpoint, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create bot: %w", err)
 	}
 
 	api.Debug = config.Debug
@@ -54,9 +47,11 @@ func New(config Config, logger *zap.Logger) (*Bot, error) {
 	}, nil
 }
 
-func newProxyClient(proxyURL string) (*http.Client, error) {
+func newClient(proxyURL string, timeout time.Duration) (*http.Client, error) {
 	if proxyURL == "" {
-		return &http.Client{}, nil
+		return &http.Client{
+			Timeout: timeout,
+		}, nil
 	}
 
 	u, err := url.Parse(proxyURL)
@@ -80,6 +75,7 @@ func newProxyClient(proxyURL string) (*http.Client, error) {
 
 	return &http.Client{
 		Transport: transport,
+		Timeout:   timeout,
 	}, nil
 }
 

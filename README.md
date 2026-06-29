@@ -34,6 +34,7 @@ TELEGRAM__TOKEN=xxx:yyyyy              # Bot token from @BotFather
 BOT__ADMIN_ID=123456789                # Your Telegram user ID
 BOT__BAN_THRESHOLD=3                   # Number of violations before ban
 TELEGRAM__PROXY_URL=socks5://user:pass@127.0.0.1:1080   # Optional SOCKS5 proxy
+TELEGRAM__TIMEOUT=30s                  # Timeout for API requests (default: 60s)
 
 # Censor Settings
 CENSOR__STRATEGY=sequential            # sequential|parallel
@@ -62,6 +63,7 @@ Create a `config.yml` file:
 ```yaml
 telegram:
   proxy_url: "socks5://user:pass@127.0.0.1:1080" # optional SOCKS5 proxy
+  timeout: "30s"                                 # timeout for Telegram API requests
 
 censor:
   strategy: sequential
@@ -373,8 +375,26 @@ The plugin architecture allows you to create custom filtering logic by implement
 
 **Solution:**
 - Increase `CENSOR__TIMEOUT` value
+- If using LLM plugin, reduce its timeout
+- Review plugin execution times in Prometheus metrics
 - Optimize slow plugins
 - Use `parallel` strategy instead of `sequential`
+
+### Telegram Connection Timeout Errors
+**Symptom:** Bot fails to start or connection hangs
+
+**Solution:**
+- Increase `TELEGRAM__TIMEOUT` value
+- Check if Telegram API is accessible
+- Verify proxy configuration if using a proxy
+- Check network connectivity
+
+### Telegram Request Timeout Errors
+**Symptom:** API requests fail with timeout errors
+
+**Solution:**
+- Increase `TELEGRAM__TIMEOUT` value
+- Check network stability
 
 ### High Memory Usage
 **Symptom:** Bot consumes excessive memory
@@ -409,6 +429,7 @@ The plugin architecture allows you to create custom filtering logic by implement
 - Ensure the SOCKS5 proxy server is reachable from the bot's network
 - Check proxy credentials if authentication is required
 - Review logs for connection refused or timeout errors
+- Adjust `TELEGRAM__TIMEOUT` if proxy is slow
 
 ## Contributing
 

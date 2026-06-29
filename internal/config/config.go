@@ -16,8 +16,9 @@ type Bot struct {
 }
 
 type telegram struct {
-	Token    string `koanf:"token"`
-	ProxyURL string `koanf:"proxy_url"`
+	Token    string        `koanf:"token"`
+	ProxyURL string        `koanf:"proxy_url"`
+	Timeout  time.Duration `koanf:"timeout"`
 }
 
 type plugin struct {
@@ -63,7 +64,11 @@ func Default() Config {
 		Bot: Bot{
 			BanThreshold: 3,
 		},
-		Telegram: telegram{},
+		Telegram: telegram{
+			Token:    "",
+			ProxyURL: "",
+			Timeout:  time.Minute,
+		},
 		Censor: Censor{
 			Strategy:    censor.StrategySequential,
 			Timeout:     30 * time.Second,
