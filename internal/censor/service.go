@@ -193,7 +193,7 @@ func (s *Service) evaluateSequential(
 				zap.String("plugin", p.Name()),
 				zap.Error(err),
 			)
-			return plugin.Result{}, fmt.Errorf("%w: %s", ErrPluginError, p.Name())
+			return plugin.Result{}, fmt.Errorf("%w: %s: %w", ErrPluginError, p.Name(), err)
 		}
 
 		switch result.Action {
@@ -285,7 +285,7 @@ func (s *Service) evaluateParallel(
 				zap.String("plugin", r.plugin.Name()),
 				zap.Error(r.err),
 			)
-			return plugin.Result{}, fmt.Errorf("%w: %s", ErrPluginError, r.plugin.Name())
+			return plugin.Result{}, fmt.Errorf("%w: %s: %w", ErrPluginError, r.plugin.Name(), r.err)
 		}
 
 		if r.result.Action == plugin.ActionAllow {
