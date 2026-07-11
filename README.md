@@ -196,6 +196,7 @@ llm:
   enabled: true
   priority: 200
   config:
+    base_url: "https://openrouter.ai/api/v1"  # Base URL for LLM service
     api_key: ""               # Required API key for LLM service
     model: "nvidia/nemotron-nano-9b-v2:free"  # LLM model to use
     confidence_threshold: 0.8 # Threshold for blocking (0.0-1.0)

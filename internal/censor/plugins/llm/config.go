@@ -8,6 +8,8 @@ import (
 )
 
 const (
+	// DefaultBaseURL is the default base URL for the LLM API.
+	DefaultBaseURL = "https://openrouter.ai/api/v1"
 	// DefaultModel is the default LLM model.
 	DefaultModel = "nvidia/nemotron-nano-9b-v2:free"
 	// DefaultConfidenceThreshold is the default confidence threshold for blocking messages.
@@ -42,6 +44,7 @@ const (
 
 // Config represents the configuration for the LLM plugin.
 type Config struct {
+	BaseURL             string        // Base URL for the LLM service
 	APIKey              string        `json:"-"` // API key for the LLM service
 	Model               string        // LLM model to use
 	ConfidenceThreshold float64       // Confidence threshold for blocking (0.0 - 1.0)
@@ -57,6 +60,11 @@ type Config struct {
 func NewConfig(config map[string]any) (Config, error) {
 	var err error
 	c := DefaultConfig()
+
+	// Parse BaseURL
+	if c.BaseURL, err = plugin.ConfigValue(config, "base_url", c.BaseURL); err != nil {
+		return Config{}, err //nolint:wrapcheck // no need
+	}
 
 	// Parse APIKey
 	if c.APIKey, err = plugin.ConfigValue(config, "api_key", c.APIKey); err != nil {
@@ -128,6 +136,7 @@ func NewConfig(config map[string]any) (Config, error) {
 // DefaultConfig returns a configuration with sensible defaults.
 func DefaultConfig() Config {
 	return Config{
+		BaseURL:             DefaultBaseURL,
 		APIKey:              "",
 		ConfidenceThreshold: DefaultConfidenceThreshold,
 		Timeout:             DefaultTimeout,
