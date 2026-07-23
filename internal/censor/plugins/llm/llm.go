@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugin"
 	"github.com/revrost/go-openrouter"
@@ -40,7 +41,7 @@ type Plugin struct {
 	config         Config
 	client         *openrouter.Client
 	responseSchema *jsonschema.Definition
-	cache          Cache // Add cache
+	cache          Cache
 }
 
 func New(config Config) (plugin.Plugin, error) {
@@ -49,13 +50,19 @@ func New(config Config) (plugin.Plugin, error) {
 		return nil, fmt.Errorf("failed to generate response schema: %w", err)
 	}
 
+	baseURL := DefaultBaseURL
+	if config.BaseURL != "" {
+		baseURL = strings.TrimRight(config.BaseURL, "/")
+	}
+
+	clientConfig := openrouter.DefaultConfig(config.APIKey)
+	clientConfig.BaseURL = baseURL
+	clientConfig.HttpReferer = "https://t.me/NeoCensorBot"
+	clientConfig.XTitle = "NeoCensorBot"
+
 	return &Plugin{
-		config: config,
-		client: openrouter.NewClient(
-			config.APIKey,
-			openrouter.WithXTitle("NeoCensorBot"),
-			openrouter.WithHTTPReferer("https://t.me/NeoCensorBot"),
-		),
+		config:         config,
+		client:         openrouter.NewClientWithConfig(*clientConfig),
 		responseSchema: responseSchema,
 		cache:          NewStorage(config.CacheTTL, config.CacheMaxSize),
 	}, nil
@@ -159,6 +166,9 @@ func (p *Plugin) callLLMAPI(ctx context.Context, prompt string) (*Response, erro
 
 	res, err := p.client.CreateChatCompletion(ctx, request)
 	if err != nil {
+		if code, ok := openrouter.HTTPStatusCode(err); ok {
+			return nil, fmt.Errorf("failed to call LLM API (HTTP %d): %w", code, err)
+		}
 		return nil, fmt.Errorf("failed to call LLM API: %w", err)
 	}
 

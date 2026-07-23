@@ -23,6 +23,7 @@ func TestNewConfig(t *testing.T) {
 				"prompt":  "Test prompt",
 			},
 			want: llm.Config{
+				BaseURL:             llm.DefaultBaseURL,
 				APIKey:              "test-key",
 				Model:               "gpt-3.5-turbo",
 				Prompt:              "Test prompt",
@@ -41,12 +42,14 @@ func TestNewConfig(t *testing.T) {
 			config: map[string]any{
 				"api_key":              "test-key",
 				"model":                "gpt-4",
+				"base_url":             "https://custom.example/v1",
 				"confidence_threshold": 0.9,
 				"timeout":              "45s",
 				"prompt":               "Custom prompt",
 				"temperature":          0.7,
 			},
 			want: llm.Config{
+				BaseURL:             "https://custom.example/v1",
 				APIKey:              "test-key",
 				Model:               "gpt-4",
 				ConfidenceThreshold: 0.9,
