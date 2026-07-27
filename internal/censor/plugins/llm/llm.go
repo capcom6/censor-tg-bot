@@ -3,12 +3,14 @@ package llm
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugin"
-	"github.com/revrost/go-openrouter"
-	"github.com/revrost/go-openrouter/jsonschema"
+	"github.com/invopop/jsonschema"
+	openai "github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
 )
 
 type Response struct {
@@ -39,15 +41,25 @@ func Metadata() plugin.Metadata {
 
 type Plugin struct {
 	config         Config
-	client         *openrouter.Client
-	responseSchema *jsonschema.Definition
+	client         openai.Client
+	responseSchema map[string]any
 	cache          Cache
 }
 
 func New(config Config) (plugin.Plugin, error) {
-	responseSchema, err := jsonschema.GenerateSchemaForType(new(Response))
+	reflector := jsonschema.Reflector{
+		AllowAdditionalProperties: false,
+		DoNotReference:            true,
+	}
+	schema := reflector.Reflect(new(Response))
+	schemaBytes, err := json.Marshal(schema)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate response schema: %w", err)
+		return nil, fmt.Errorf("failed to marshal response schema: %w", err)
+	}
+
+	var responseSchema map[string]any
+	if err = json.Unmarshal(schemaBytes, &responseSchema); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response schema: %w", err)
 	}
 
 	baseURL := DefaultBaseURL
@@ -55,14 +67,16 @@ func New(config Config) (plugin.Plugin, error) {
 		baseURL = strings.TrimRight(config.BaseURL, "/")
 	}
 
-	clientConfig := openrouter.DefaultConfig(config.APIKey)
-	clientConfig.BaseURL = baseURL
-	clientConfig.HttpReferer = "https://t.me/NeoCensorBot"
-	clientConfig.XTitle = "NeoCensorBot"
+	client := openai.NewClient(
+		option.WithAPIKey(config.APIKey),
+		option.WithBaseURL(baseURL),
+		option.WithHeader("HTTP-Referer", "https://t.me/NeoCensorBot"),
+		option.WithHeader("X-Title", "NeoCensorBot"),
+	)
 
 	return &Plugin{
 		config:         config,
-		client:         openrouter.NewClientWithConfig(*clientConfig),
+		client:         client,
 		responseSchema: responseSchema,
 		cache:          NewStorage(config.CacheTTL, config.CacheMaxSize),
 	}, nil
@@ -147,27 +161,26 @@ func (p *Plugin) callLLMAPI(ctx context.Context, prompt string) (*Response, erro
 	ctx, cancel := context.WithTimeout(ctx, p.config.Timeout)
 	defer cancel()
 
-	request := openrouter.ChatCompletionRequest{
+	res, err := p.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Model: p.config.Model,
-		Messages: []openrouter.ChatCompletionMessage{
-			openrouter.UserMessage(prompt),
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage(prompt),
 		},
-		ResponseFormat: &openrouter.ChatCompletionResponseFormat{
-			Type: openrouter.ChatCompletionResponseFormatTypeJSONSchema,
-			JSONSchema: &openrouter.ChatCompletionResponseFormatJSONSchema{
-				Name:        "response",
-				Schema:      p.responseSchema,
-				Strict:      true,
-				Description: "",
+		ResponseFormat: openai.ChatCompletionNewParamsResponseFormatUnion{
+			OfJSONSchema: &openai.ResponseFormatJSONSchemaParam{
+				JSONSchema: openai.ResponseFormatJSONSchemaJSONSchemaParam{
+					Name:   "response",
+					Schema: p.responseSchema,
+					Strict: openai.Bool(true),
+				},
 			},
 		},
-		Temperature: float32(p.config.Temperature),
-	}
-
-	res, err := p.client.CreateChatCompletion(ctx, request)
+		Temperature: openai.Float(p.config.Temperature),
+	})
 	if err != nil {
-		if code, ok := openrouter.HTTPStatusCode(err); ok {
-			return nil, fmt.Errorf("failed to call LLM API (HTTP %d): %w", code, err)
+		var apiErr *openai.Error
+		if errors.As(err, &apiErr) {
+			return nil, fmt.Errorf("failed to call LLM API (HTTP %d): %w", apiErr.StatusCode, err)
 		}
 		return nil, fmt.Errorf("failed to call LLM API: %w", err)
 	}
@@ -178,7 +191,7 @@ func (p *Plugin) callLLMAPI(ctx context.Context, prompt string) (*Response, erro
 
 	response := new(Response)
 
-	if jsonErr := json.Unmarshal([]byte(res.Choices[0].Message.Content.Text), response); jsonErr != nil {
+	if jsonErr := json.Unmarshal([]byte(res.Choices[0].Message.Content), response); jsonErr != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", jsonErr)
 	}
 
