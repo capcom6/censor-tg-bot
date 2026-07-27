@@ -262,8 +262,13 @@ linters:
         - ^github.com/go-telegram/bot/models.+$
         - ^github.com/gofiber/.+Config$
         - ^github.com/golang-jwt/jwt/v5.+Claims$
+        - ^github.com/invopop/jsonschema.Reflector$
         - ^github.com/mitchellh/mapstructure.DecoderConfig$
-        - ^github.com/mymmrac/telego.+Parameters$
+        - ^github.com/mymmrac/telego.+Params$
+        - ^github.com/openai/openai-go/v3/shared\.ResponseFormatJSONSchemaJSONSchemaParam$
+        - ^github.com/openai/openai-go/v3/shared\.ResponseFormatJSONSchemaParam$
+        - ^github.com/openai/openai-go/v3\.ChatCompletionNewParams$
+        - ^github.com/openai/openai-go/v3\.ChatCompletionNewParamsResponseFormatUnion$
         - ^github.com/prometheus/client_golang/.+Opts$
         - ^github.com/revrost/go-openrouter.+$
         - ^github.com/secsy/goftp.Config$
@@ -278,6 +283,7 @@ linters:
         - ^github.com/urfave/cli.v3.ArgumentBase$
         - ^github.com/urfave/cli.v3.Command$
         - ^github.com/urfave/cli.v3.FlagBase$
+        - ^github.com/valyala/fasthttp.Client$
         - ^golang.org/x/tools/go/analysis.Analyzer$
         - ^google.golang.org/protobuf/.+Options$
         - ^gopkg.in/telebot.v4.LongPoller$
