@@ -1,5 +1,5 @@
 # Building the binary of the App
-FROM golang:1.24-alpine AS build
+FROM golang:1.25-alpine AS build
 
 ARG APP
 WORKDIR /go/src
@@ -18,7 +18,7 @@ COPY . .
 RUN CGO_ENABLED=0 go build -a -installsuffix cgo -o app .
 
 # Moving the binary to the 'final Image' to make it smaller
-FROM alpine:3.22.2 as prod
+FROM alpine:3.22.2 AS prod
 
 WORKDIR /app
 
