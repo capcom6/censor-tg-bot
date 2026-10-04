@@ -158,6 +158,40 @@ The `plugin.Message` struct provides access to:
 - `ChatID` - Telegram chat ID
 - `MessageID` - Unique message identifier
 - `IsEdit` - Whether this is an edited message
+- `Media` - Downloaded photo content, `nil` for messages without one (see below)
+
+### Media (opt-in)
+
+`Message.Media` is a `*plugin.Media` and is **`nil` for every message that does not carry a downloaded photo**, so always nil-check it before use:
+
+```go
+type Media struct {
+    Bytes       []byte // Raw image bytes exactly as downloaded
+    ContentType string // MIME type detected from the bytes, e.g. "image/jpeg"
+    SizeBytes   int    // Length of Bytes in bytes
+    SHA256      string // Full lowercase hex SHA-256 digest of Bytes
+}
+```
+
+No plugin needs to re-hash content that already carries a digest.
+
+Media is **not** downloaded for you. To receive it, implement the optional `MediaConsumer` capability interface:
+
+```go
+type MediaConsumer interface {
+    // NeedsMedia reports whether the plugin needs the media of the given message.
+    NeedsMedia(msg Message) bool
+}
+```
+
+The service asks every enabled plugin this question through `Service.RequiresMedia()` **before any media is downloaded**. Two consequences:
+
+- `NeedsMedia` is called with an empty `Message` — there is nothing about the specific message to inspect yet, so decide from your own configuration. The built-in `duplicate` and `llm` plugins do exactly this.
+- Returning `false` means no photo is ever fetched, so your plugin gets `nil` media at zero cost. Returning `true` means every photo in the group is downloaded before `Evaluate` runs.
+
+Only Telegram photos are downloaded today; stickers, documents, videos and animations always arrive with `Media == nil`. Downloading is bounded by `bot.media.max_bytes`, so a photo larger than that limit never reaches a plugin at all.
+
+`NeedsMedia` is an optional interface: a plugin that does not implement it is unaffected by all of the above.
 
 ### Best Practices
 

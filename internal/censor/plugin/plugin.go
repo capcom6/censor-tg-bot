@@ -33,6 +33,7 @@ type Message struct {
 	IsEdit              bool   // Whether this is an edited message
 	ForwardedFromUserID *int64 // User ID of original message author (if forwarded)
 	ForwardedFromChatID *int64 // Chat ID where original message was sent (if forwarded)
+	Media               *Media // Downloaded image content, nil for non-photo messages in v1
 }
 
 // Metadata contains information about a plugin.

@@ -16,12 +16,15 @@ const (
 	MinWindow = 10 * time.Second
 	// MaxWindow is the maximum reasonable window duration.
 	MaxWindow = 24 * time.Hour
+	// DefaultImageEnabled is the default value for image duplicate detection.
+	DefaultImageEnabled = false
 )
 
 // Config represents the configuration for the duplicate detection plugin.
 type Config struct {
 	MaxDuplicates int           // Maximum number of duplicate messages allowed before blocking
 	Window        time.Duration // Time window to consider messages as duplicates
+	ImageEnabled  bool          // Whether to detect duplicate images by content hash
 }
 
 // NewConfig creates a new configuration from the provided map.
@@ -56,6 +59,14 @@ func NewConfig(config map[string]any) (Config, error) {
 		}
 	}
 
+	// Parse ImageEnabled
+	imageEnabled, imageErr := plugin.ConfigValue(config, "image_enabled", c.ImageEnabled)
+	if imageErr != nil {
+		return Config{}, fmt.Errorf("failed to parse image_enabled: %w", imageErr)
+	}
+
+	c.ImageEnabled = imageEnabled
+
 	// Validate the configuration
 	if err := c.Validate(); err != nil {
 		return Config{}, err
@@ -69,6 +80,7 @@ func DefaultConfig() Config {
 	return Config{
 		MaxDuplicates: DefaultMaxDuplicates,
 		Window:        DefaultWindow,
+		ImageEnabled:  DefaultImageEnabled,
 	}
 }
 
