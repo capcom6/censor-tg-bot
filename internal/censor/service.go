@@ -80,10 +80,50 @@ func (s *Service) Register(p plugin.Plugin) error {
 // GetPlugins returns a copy of the current plugins list (sorted by priority).
 func (s *Service) GetPlugins() []plugin.Plugin {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
+	registered := make([]plugin.Plugin, len(s.plugins))
+	copy(registered, s.plugins)
+	s.mu.RUnlock()
 
-	plugins := lo.Filter(
-		s.plugins,
+	plugins := s.enabledPlugins(registered)
+
+	// Sort by priority (lower number = higher priority)
+	sort.Slice(plugins, func(i, j int) bool {
+		return s.getPluginPriority(plugins[i]) < s.getPluginPriority(plugins[j])
+	})
+
+	return plugins
+}
+
+// RequiresMedia reports whether any enabled plugin needs the media of a message.
+//
+// It shares the EnabledOnly filter with GetPlugins on purpose: a second, stricter
+// filter would silently miss a media-capable enabled plugin, leaving Media nil and
+// failing open. The zero Message is deliberate - Media is nil at gate time by
+// construction, so a MediaConsumer may only decide from its own configuration.
+func (s *Service) RequiresMedia() bool {
+	s.mu.RLock()
+	registered := make([]plugin.Plugin, len(s.plugins))
+	copy(registered, s.plugins)
+	s.mu.RUnlock()
+
+	// gateMessage is the zero Message; the godoc above explains why.
+	var gateMessage plugin.Message
+
+	for _, p := range s.enabledPlugins(registered) {
+		consumer, ok := p.(plugin.MediaConsumer)
+		if ok && consumer.NeedsMedia(gateMessage) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// enabledPlugins filters the given plugins with the EnabledOnly configuration.
+// It is the single copy of that filter shared by every consumer of the plugin list.
+func (s *Service) enabledPlugins(plugins []plugin.Plugin) []plugin.Plugin {
+	return lo.Filter(
+		plugins,
 		func(p plugin.Plugin, _ int) bool {
 			if !s.config.EnabledOnly {
 				return true
@@ -96,13 +136,6 @@ func (s *Service) GetPlugins() []plugin.Plugin {
 			return false
 		},
 	)
-
-	// Sort by priority (lower number = higher priority)
-	sort.Slice(plugins, func(i, j int) bool {
-		return s.getPluginPriority(plugins[i]) < s.getPluginPriority(plugins[j])
-	})
-
-	return plugins
 }
 
 // Evaluate runs plugins according to the configured strategy.

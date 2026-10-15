@@ -1,6 +1,7 @@
 package llm_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -34,6 +35,14 @@ func TestNewConfig(t *testing.T) {
 				CacheTTL:     llm.DefaultCacheTTL,
 				CacheMaxSize: llm.DefaultCacheMaxSize,
 				CacheEnabled: true,
+
+				ImageEnabled: false,
+				VisionModel:  "",
+				ImagePrompt:  llm.DefaultImagePrompt,
+				// The inline budget has no default: bot.media.max_bytes is already the
+				// download bound and a capping default would silently disable photo
+				// moderation.
+				MaxInlineImageBytes: 0,
 			},
 			wantErr: false,
 		},
@@ -60,6 +69,12 @@ func TestNewConfig(t *testing.T) {
 				CacheTTL:     llm.DefaultCacheTTL,
 				CacheMaxSize: llm.DefaultCacheMaxSize,
 				CacheEnabled: true,
+
+				ImageEnabled: false,
+				VisionModel:  "",
+				ImagePrompt:  llm.DefaultImagePrompt,
+
+				MaxInlineImageBytes: 0,
 			},
 			wantErr: false,
 		},
@@ -108,6 +123,100 @@ func TestNewConfig(t *testing.T) {
 				"api_key": "test-key",
 				"model":   "gpt-3.5-turbo",
 				"prompt":  "", // Explicitly set to empty to test missing prompt
+			},
+			wantErr: true,
+		},
+		{
+			// Turning photo moderation on without saying which model judges the photos
+			// would otherwise ship every photo to the TEXT model and block on a text
+			// verdict, so the deployment must fail at startup instead.
+			name: "image moderation without a vision model",
+			config: map[string]any{
+				"api_key":       "test-key",
+				"image_enabled": true,
+			},
+			wantErr: true,
+		},
+		{
+			name: "image moderation with a vision model",
+			config: map[string]any{
+				"api_key":       "test-key",
+				"image_enabled": true,
+				"vision_model":  "vision/test-model",
+			},
+			want: llm.Config{
+				BaseURL:             llm.DefaultBaseURL,
+				APIKey:              "test-key",
+				Model:               llm.DefaultModel,
+				Prompt:              llm.DefaultPrompt,
+				ConfidenceThreshold: llm.DefaultConfidenceThreshold,
+				Timeout:             llm.DefaultTimeout,
+				Temperature:         llm.DefaultTemperature,
+				CacheTTL:            llm.DefaultCacheTTL,
+				CacheMaxSize:        llm.DefaultCacheMaxSize,
+				CacheEnabled:        true,
+				ImageEnabled:        true,
+				VisionModel:         "vision/test-model",
+				ImagePrompt:         llm.DefaultImagePrompt,
+			},
+			wantErr: false,
+		},
+		{
+			name: "image moderation with its own prompt and inline budget",
+			config: map[string]any{
+				"api_key":                "test-key",
+				"image_enabled":          true,
+				"vision_model":           "vision/test-model",
+				"image_prompt":           "describe the photo",
+				"max_inline_image_bytes": 2_000_000,
+			},
+			want: llm.Config{
+				BaseURL:             llm.DefaultBaseURL,
+				APIKey:              "test-key",
+				Model:               llm.DefaultModel,
+				Prompt:              llm.DefaultPrompt,
+				ConfidenceThreshold: llm.DefaultConfidenceThreshold,
+				Timeout:             llm.DefaultTimeout,
+				Temperature:         llm.DefaultTemperature,
+				CacheTTL:            llm.DefaultCacheTTL,
+				CacheMaxSize:        llm.DefaultCacheMaxSize,
+				CacheEnabled:        true,
+				ImageEnabled:        true,
+				VisionModel:         "vision/test-model",
+				ImagePrompt:         "describe the photo",
+				MaxInlineImageBytes: 2_000_000,
+			},
+			wantErr: false,
+		},
+		{
+			name: "a negative inline budget is refused",
+			config: map[string]any{
+				"api_key":                "test-key",
+				"max_inline_image_bytes": -1,
+			},
+			wantErr: true,
+		},
+		{
+			name: "an oversized vision model id is refused",
+			config: map[string]any{
+				"api_key":      "test-key",
+				"vision_model": strings.Repeat("m", llm.MaxVisionModelLength+1),
+			},
+			wantErr: true,
+		},
+		{
+			name: "an oversized image prompt is refused",
+			config: map[string]any{
+				"api_key":      "test-key",
+				"image_prompt": strings.Repeat("p", llm.MaxImagePromptLength+1),
+			},
+			wantErr: true,
+		},
+		{
+			name: "a mistyped image_enabled is refused",
+			config: map[string]any{
+				"api_key":       "test-key",
+				"image_enabled": "yes",
 			},
 			wantErr: true,
 		},
@@ -240,6 +349,18 @@ func TestDefaultConfig(t *testing.T) {
 	require.Equal(t, llm.DefaultModel, config.Model)
 	require.InDelta(t, llm.DefaultTemperature, config.Temperature, 0.0001)
 	require.NotEmpty(t, config.Prompt)
+
+	// Photo moderation is off by default because it ships every photo to a third-party
+	// provider and costs money per call.
+	require.False(t, config.ImageEnabled)
+	require.Empty(t, config.VisionModel, "no vision model is shipped as a default")
+	require.Equal(t, llm.DefaultImagePrompt, config.ImagePrompt)
+
+	// The inline budget has no default: bot.media.max_bytes is already the download
+	// bound, and a capping default would silently kill photo moderation.
+	require.Zero(t, config.MaxInlineImageBytes)
+
+	require.NoError(t, config.Validate())
 }
 
 func TestConstants(t *testing.T) {

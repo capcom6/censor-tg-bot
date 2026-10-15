@@ -1,3 +1,15 @@
+# Media download bounds. Only read when a media-capable plugin is enabled
+# (duplicate.image_enabled or llm.image_enabled); see the README section
+# "Photo Moderation" for the privacy, cost and outage implications.
+# bot:
+#   media:
+#     # Largest Telegram photo the bot will download, in bytes (5 MiB).
+#     # Larger variants are skipped, never blocked.
+#     max_bytes: 5242880
+#     # Deadline for one photo download. The update pump is serial, so the
+#     # per-message worst case is this plus censor.timeout (5s + 30s).
+#     timeout: 5s
+
 telegram:
   proxy_url: "socks5://user:pass@127.0.0.1:1080" # optional SOCKS5 proxy
 
@@ -73,6 +85,11 @@ censor:
         # Supported formats: "30s", "5m", "1h", "24h"
         window: "5m"
 
+        # Also deduplicate photos by SHA-256 content hash (default: false)
+        # Byte-identical only: re-uploads and re-encodes are NOT detected.
+        # Requires a bot.media section above (or BOT__MEDIA__* env vars).
+        image_enabled: false
+
     llm:
       enabled: true
       priority: 250
@@ -88,4 +105,21 @@ censor:
         # Time to live for cached responses (supported formats: "30s", "5m", "1h")
         cache_ttl: "1h" # default: "1h"
         # Maximum number of responses to cache
+        # Applied PER MODALITY: text and photos each get their own cache.
         cache_max_size: 1000 # default: 1000
+
+        # Photo moderation. Off by default; read the README section
+        # "Photo Moderation" before turning it on. Every photo is base64-encoded and
+        # sent to the provider named by base_url (OpenRouter by default), there is
+        # no local spend ceiling, and a failed vision call deletes the message and
+        # counts a violation against its sender.
+        image_enabled: false # default: false
+        # No default on purpose. Required when image_enabled is true.
+        # vision_model: "your-vision-model-id"
+        # Instruction sent with every photo; has a default.
+        # image_prompt: "Analyze the attached photo..."
+        # Optional local budget for one photo, in DECODED image bytes (the same
+        # unit as bot.media.max_bytes, NOT base64-inflated or HTTP-body bytes).
+        # 0 means no additional limit. Set it at or below bot.media.max_bytes.
+        # This is local policy, not a provider limit: the provider publishes none.
+        # max_inline_image_bytes: 0

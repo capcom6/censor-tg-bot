@@ -10,9 +10,23 @@ import (
 	"github.com/go-core-fx/config"
 )
 
+const (
+	// defaultMediaMaxBytes is the largest Telegram photo the bot downloads.
+	defaultMediaMaxBytes int64 = 5 * 1024 * 1024
+	// defaultMediaTimeout bounds one download. The update pump is a single serial
+	// loop, so the per-message worst case is this plus censor.Timeout.
+	defaultMediaTimeout = 5 * time.Second
+)
+
+type media struct {
+	MaxBytes int64         `koanf:"max_bytes"`
+	Timeout  time.Duration `koanf:"timeout"`
+}
+
 type Bot struct {
 	AdminID      int64 `koanf:"admin_id"`
 	BanThreshold uint8 `koanf:"ban_threshold"`
+	Media        media `koanf:"media"`
 }
 
 type telegram struct {
@@ -63,6 +77,10 @@ func Default() Config {
 	return Config{
 		Bot: Bot{
 			BanThreshold: 3,
+			Media: media{
+				MaxBytes: defaultMediaMaxBytes,
+				Timeout:  defaultMediaTimeout,
+			},
 		},
 		Telegram: telegram{
 			Token:    "",

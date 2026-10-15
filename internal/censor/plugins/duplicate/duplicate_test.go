@@ -2,6 +2,8 @@ package duplicate_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"testing"
 	"time"
@@ -355,7 +357,7 @@ func TestPlugin_HashGeneration(t *testing.T) {
 	// Hash should be consistent and deterministic
 	require.Equal(
 		t,
-		"95a0db0d",
+		"text:95a0db0d",
 		result2.Metadata["message_hash"],
 	)
 }
@@ -483,6 +485,213 @@ func TestPlugin_EmptyMessageHandling(t *testing.T) {
 			require.Equal(t, tt.reason, result.Reason)
 		})
 	}
+}
+
+func TestPlugin_ImageDedup(t *testing.T) {
+	// The text hash of "Test message for hashing" is pinned by TestPlugin_HashGeneration.
+	const textHashHex = "95a0db0d"
+
+	imageBytes := []byte("\x89PNG\r\n\x1a\nfake-image-bytes")
+	imageSum := sha256.Sum256(imageBytes)
+	imageHex := hex.EncodeToString(imageSum[:])
+
+	newMedia := func() *plugin.Media {
+		return &plugin.Media{
+			Bytes:       imageBytes,
+			ContentType: "image/png",
+			SizeBytes:   len(imageBytes),
+			SHA256:      imageHex,
+		}
+	}
+
+	imageConfig := duplicate.Config{
+		MaxDuplicates: 1,
+		Window:        5 * time.Minute,
+		ImageEnabled:  true,
+	}
+
+	t.Run("caption-less photo is blocked on the second occurrence", func(t *testing.T) {
+		p := duplicate.New(imageConfig)
+		msg := plugin.Message{ChatID: 12345, Media: newMedia()}
+
+		first, err := p.Evaluate(context.Background(), msg)
+		require.NoError(t, err)
+		require.Equal(t, plugin.ActionSkip, first.Action)
+		require.Equal(t, "duplicate limit not exceeded", first.Reason)
+		require.Equal(t, "image", first.Metadata["modality"])
+		require.Equal(t, "image:"+imageHex, first.Metadata["image_hash"])
+		require.NotContains(t, first.Metadata, "message_hash")
+
+		second, err := p.Evaluate(context.Background(), msg)
+		require.NoError(t, err)
+		require.Equal(t, plugin.ActionSkip, second.Action)
+
+		third, err := p.Evaluate(context.Background(), msg)
+		require.NoError(t, err)
+		require.Equal(t, plugin.ActionBlock, third.Action)
+		require.Equal(
+			t,
+			"duplicate limit exceeded (3 occurrences, max 2 allowed in 5m0s)",
+			third.Reason,
+		)
+		require.Equal(t, "image", third.Metadata["modality"])
+		require.Equal(t, "image:"+imageHex, third.Metadata["image_hash"])
+	})
+
+	t.Run("captioned photo records text and image candidates independently", func(t *testing.T) {
+		p := duplicate.New(imageConfig)
+		msg := plugin.Message{
+			Caption: "Test message for hashing",
+			ChatID:  12345,
+			Media:   newMedia(),
+		}
+
+		result, err := p.Evaluate(context.Background(), msg)
+		require.NoError(t, err)
+		require.Equal(t, plugin.ActionSkip, result.Action)
+		require.Equal(t, "text:"+textHashHex, result.Metadata["message_hash"])
+		require.Equal(t, "image:"+imageHex, result.Metadata["image_hash"])
+		// Two modalities were recorded, so a single modality label would lie.
+		require.NotContains(t, result.Metadata, "modality")
+
+		// Both counters advanced exactly once per message, so the third blocks at 3.
+		second, err := p.Evaluate(context.Background(), msg)
+		require.NoError(t, err)
+		require.Equal(t, plugin.ActionSkip, second.Action)
+
+		third, err := p.Evaluate(context.Background(), msg)
+		require.NoError(t, err)
+		require.Equal(t, plugin.ActionBlock, third.Action)
+		require.Equal(t, "text", third.Metadata["modality"])
+		require.Equal(t, 3, third.Metadata["count"])
+
+		// The image counter moved with the text counter, so the very same photo
+		// without a caption is now at its own limit.
+		imageOnly, err := p.Evaluate(context.Background(), plugin.Message{
+			ChatID: 12345,
+			Media:  newMedia(),
+		})
+		require.NoError(t, err)
+		require.Equal(t, plugin.ActionBlock, imageOnly.Action)
+		require.Equal(t, "image", imageOnly.Metadata["modality"])
+		require.Equal(
+			t,
+			"duplicate limit exceeded (4 occurrences, max 2 allowed in 5m0s)",
+			imageOnly.Reason,
+		)
+	})
+
+	t.Run("text and image key spaces are disjoint", func(t *testing.T) {
+		p := duplicate.New(imageConfig)
+
+		// The image digest is deliberately equal to the text hash, so the two
+		// candidates would collide without the namespace prefix.
+		textMsg := plugin.Message{Text: "Test message for hashing", ChatID: 12345}
+		imageMsg := plugin.Message{
+			ChatID: 12345,
+			Media: &plugin.Media{
+				Bytes:       imageBytes,
+				ContentType: "image/png",
+				SizeBytes:   len(imageBytes),
+				SHA256:      textHashHex,
+			},
+		}
+
+		for range 2 {
+			for _, msg := range []plugin.Message{textMsg, imageMsg} {
+				result, err := p.Evaluate(context.Background(), msg)
+				require.NoError(t, err)
+				require.Equal(t, plugin.ActionSkip, result.Action)
+			}
+		}
+
+		result, err := p.Evaluate(context.Background(), textMsg)
+		require.NoError(t, err)
+		require.Equal(t, plugin.ActionBlock, result.Action)
+		// Four image occurrences must not have inflated the text counter.
+		require.Equal(
+			t,
+			"duplicate limit exceeded (3 occurrences, max 2 allowed in 5m0s)",
+			result.Reason,
+		)
+		require.Equal(t, "text:"+textHashHex, result.Metadata["message_hash"])
+	})
+
+	t.Run("image disabled records no image candidate", func(t *testing.T) {
+		p := duplicate.New(duplicate.Config{
+			MaxDuplicates: 1,
+			Window:        5 * time.Minute,
+			ImageEnabled:  false,
+		})
+
+		consumer, ok := p.(plugin.MediaConsumer)
+		require.True(t, ok)
+		require.False(t, consumer.NeedsMedia(plugin.Message{}))
+
+		msg := plugin.Message{ChatID: 12345, Media: newMedia()}
+
+		for range 5 {
+			result, err := p.Evaluate(context.Background(), msg)
+			require.NoError(t, err)
+			require.Equal(t, plugin.ActionSkip, result.Action)
+			require.Equal(t, "message too short for duplicate detection", result.Reason)
+			require.NotContains(t, result.Metadata, "image_hash")
+		}
+	})
+
+	t.Run("needs media follows the configuration", func(t *testing.T) {
+		p := duplicate.New(imageConfig)
+
+		consumer, ok := p.(plugin.MediaConsumer)
+		require.True(t, ok)
+		require.True(t, consumer.NeedsMedia(plugin.Message{}))
+	})
+
+	t.Run("missing digest falls back to hashing the bytes", func(t *testing.T) {
+		p := duplicate.New(imageConfig)
+		msg := plugin.Message{
+			ChatID: 12345,
+			Media: &plugin.Media{
+				Bytes:       imageBytes,
+				ContentType: "image/png",
+				SizeBytes:   len(imageBytes),
+				SHA256:      "",
+			},
+		}
+
+		result, err := p.Evaluate(context.Background(), msg)
+		require.NoError(t, err)
+		require.Equal(t, "image:"+imageHex, result.Metadata["image_hash"])
+
+		// The fallback must produce the same key as a producer-computed digest.
+		withDigest := duplicate.New(imageConfig)
+		other, err := withDigest.Evaluate(context.Background(), plugin.Message{
+			ChatID: 12345,
+			Media:  newMedia(),
+		})
+		require.NoError(t, err)
+		require.Equal(t, result.Metadata["image_hash"], other.Metadata["image_hash"])
+	})
+
+	t.Run("media without digest and bytes drops the image candidate", func(t *testing.T) {
+		p := duplicate.New(imageConfig)
+		msg := plugin.Message{
+			ChatID: 12345,
+			Media: &plugin.Media{
+				Bytes:       nil,
+				ContentType: "image/png",
+				SizeBytes:   0,
+				SHA256:      "",
+			},
+		}
+
+		result, err := p.Evaluate(context.Background(), msg)
+		require.NoError(t, err)
+		require.Equal(t, plugin.ActionSkip, result.Action)
+		require.Equal(t, "message too short for duplicate detection", result.Reason)
+		require.NotContains(t, result.Metadata, "image_hash")
+		require.NotEmpty(t, result.Metadata["image_skipped"])
+	})
 }
 
 // Benchmark tests for performance testing.

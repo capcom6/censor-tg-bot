@@ -49,6 +49,25 @@ func TestStorage_GetSet(t *testing.T) {
 	}
 }
 
+func TestStorage_GetBy_DistinctPrompt(t *testing.T) {
+	// The image cache key must include the prompt and the model: the plugin fixes
+	// both at construction, so this is the level where the composition is observable.
+	storage := llm.NewStorage(10*time.Second, 10)
+	response := &llm.Response{Inappropriate: true, Confidence: 0.9, Reason: "test reason"}
+
+	storage.SetBy("image:abc123", "vision/model", "prompt A", response)
+
+	if _, found := storage.GetBy("image:abc123", "vision/model", "prompt A"); !found {
+		t.Errorf("Expected a hit for the same key, model and prompt")
+	}
+	if _, found := storage.GetBy("image:abc123", "vision/model", "prompt B"); found {
+		t.Errorf("Expected a miss when only the prompt differs")
+	}
+	if _, found := storage.GetBy("image:abc123", "other/model", "prompt A"); found {
+		t.Errorf("Expected a miss when only the model differs")
+	}
+}
+
 func TestStorage_ExpiredEntry(t *testing.T) {
 	// Create a new storage with 1ms TTL and max size of 10
 	storage := llm.NewStorage(1*time.Millisecond, 10)

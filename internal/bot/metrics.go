@@ -8,6 +8,11 @@ import (
 type (
 	MetricLabelAction string
 	MetricLabelStatus string
+
+	// MetricLabelMediaResult is the outcome of one Telegram photo download. Its four
+	// values are the whole label set: an ABSENCE of an image is not a FAILURE to
+	// obtain one, and the two must stay greppable apart.
+	MetricLabelMediaResult string
 )
 
 const (
@@ -21,10 +26,18 @@ const (
 
 	MetricLabelStatusSuccess MetricLabelStatus = "success"
 	MetricLabelStatusFailed  MetricLabelStatus = "failed"
+
+	MetricLabelMediaResultOK          MetricLabelMediaResult = "ok"
+	MetricLabelMediaResultTooLarge    MetricLabelMediaResult = "too_large"
+	MetricLabelMediaResultNotImage    MetricLabelMediaResult = "not_image"
+	MetricLabelMediaResultFetchFailed MetricLabelMediaResult = "fetch_failed"
 )
 
 type Metrics struct {
 	processedActionsTotal *prometheus.CounterVec
+
+	mediaDownloadsTotal     *prometheus.CounterVec
+	mediaDownloadBytesTotal prometheus.Counter
 }
 
 func NewMetrics() *Metrics {
@@ -35,9 +48,33 @@ func NewMetrics() *Metrics {
 			Name:      "processed_actions_total",
 			Help:      "Total number of bot actions performed",
 		}, []string{"action", "status"}),
+
+		mediaDownloadsTotal: promauto.NewCounterVec(prometheus.CounterOpts{
+			Namespace: metricsNamespace,
+			Subsystem: metricsSubsystem,
+			Name:      "media_downloads_total",
+			Help:      "Total number of Telegram photo download attempts by outcome",
+		}, []string{"result"}),
+
+		mediaDownloadBytesTotal: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: metricsNamespace,
+			Subsystem: metricsSubsystem,
+			Name:      "media_download_bytes_total",
+			Help:      "Total number of image bytes downloaded from Telegram",
+		}),
 	}
 }
 
 func (m *Metrics) IncProcessedAction(action MetricLabelAction, status MetricLabelStatus) {
 	m.processedActionsTotal.WithLabelValues(string(action), string(status)).Inc()
+}
+
+// IncMediaDownload records one photo download outcome.
+func (m *Metrics) IncMediaDownload(result MetricLabelMediaResult) {
+	m.mediaDownloadsTotal.WithLabelValues(string(result)).Inc()
+}
+
+// AddMediaDownloadBytes records the size of one successfully downloaded photo.
+func (m *Metrics) AddMediaDownloadBytes(size int) {
+	m.mediaDownloadBytesTotal.Add(float64(size))
 }
