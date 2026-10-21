@@ -13,6 +13,13 @@ import (
 type Bot struct {
 	AdminID      int64 `koanf:"admin_id"`
 	BanThreshold uint8 `koanf:"ban_threshold"`
+
+	Media botMedia `koanf:"media"`
+}
+
+type botMedia struct {
+	MaxBytes int64         `koanf:"max_bytes"`
+	Timeout  time.Duration `koanf:"timeout"`
 }
 
 type telegram struct {
@@ -50,6 +57,16 @@ type http struct {
 	Proxies     []string `koanf:"proxies"`
 }
 
+const (
+	// DefaultMediaMaxBytes is the default maximum size of a downloaded photo.
+	//
+	// It is big enough for the largest Telegram photo variant that still fits
+	// the size limit and small enough to keep the download bounded.
+	DefaultMediaMaxBytes = 10 * 1024 * 1024
+	// DefaultMediaTimeout is the default deadline for a single photo download.
+	DefaultMediaTimeout = 5 * time.Second
+)
+
 type Config struct {
 	Bot      Bot      `koanf:"bot"`
 	Telegram telegram `koanf:"telegram"`
@@ -59,10 +76,15 @@ type Config struct {
 }
 
 func Default() Config {
-	//nolint:exhaustruct,mnd // default values
+	//nolint:exhaustruct_v5,mnd // default values
 	return Config{
 		Bot: Bot{
 			BanThreshold: 3,
+
+			Media: botMedia{
+				MaxBytes: DefaultMediaMaxBytes,
+				Timeout:  DefaultMediaTimeout,
+			},
 		},
 		Telegram: telegram{
 			Token:    "",

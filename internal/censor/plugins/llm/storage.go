@@ -35,11 +35,12 @@ func NewStorage(ttl time.Duration, maxSize int) *Storage {
 	}
 }
 
-// generateCacheKey creates a stable hash key from message text, model, and prompt
-// This ensures identical content with same configuration gets cache hits.
-func (s *Storage) generateCacheKey(text string, model string, prompt string) string {
-	// Include text, model, and prompt in hash to ensure cache validity
-	data := text + "\x00" + model + "\x00" + prompt
+// generateCacheKey creates a stable hash key from message text, model, prompt and
+// media identity. This ensures identical content with same configuration gets cache
+// hits, while the same caption with a different image does not.
+func (s *Storage) generateCacheKey(text string, model string, prompt string, mediaHash string) string {
+	// Include text, model, prompt and media hash to ensure cache validity
+	data := text + "\x00" + model + "\x00" + prompt + "\x00" + mediaHash
 	hash := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(hash[:])
 }
@@ -68,8 +69,8 @@ func (s *Storage) Get(key string) (*Response, bool) {
 	return entry.Response, true
 }
 
-func (s *Storage) GetBy(text, model, prompt string) (*Response, bool) {
-	key := s.generateCacheKey(text, model, prompt)
+func (s *Storage) GetBy(text, model, prompt, mediaHash string) (*Response, bool) {
+	key := s.generateCacheKey(text, model, prompt, mediaHash)
 	return s.Get(key)
 }
 
@@ -91,8 +92,8 @@ func (s *Storage) Set(key string, resp *Response) {
 	}
 }
 
-func (s *Storage) SetBy(text, model, prompt string, resp *Response) {
-	key := s.generateCacheKey(text, model, prompt)
+func (s *Storage) SetBy(text, model, prompt, mediaHash string, resp *Response) {
+	key := s.generateCacheKey(text, model, prompt, mediaHash)
 	s.Set(key, resp)
 }
 

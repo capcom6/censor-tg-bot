@@ -1,9 +1,14 @@
 package bot
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/capcom6/censor-tg-bot/internal/censor"
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugin"
@@ -24,14 +29,24 @@ type Bot struct {
 	logger *zap.Logger
 }
 
-func New(cfg Config, censor *censor.Service, storage *storage.Storage, metrics *Metrics, logger *zap.Logger) *Bot {
+func New(
+	cfg Config,
+	censor *censor.Service,
+	storage *storage.Storage,
+	metrics *Metrics,
+	logger *zap.Logger,
+) (*Bot, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
 	return &Bot{
 		config:  cfg,
 		censor:  censor,
 		storage: storage,
 		metrics: metrics,
 		logger:  logger,
-	}
+	}, nil
 }
 
 func (b *Bot) Handler(ctx context.Context, bot *tgbotapifx.Bot, update tgbotapi.Update) error {
@@ -55,7 +70,7 @@ func (b *Bot) Handler(ctx context.Context, bot *tgbotapifx.Bot, update tgbotapi.
 }
 
 func (b *Bot) processMessage(ctx context.Context, bot *tgbotapifx.Bot, message *tgbotapi.Message) error {
-	result := b.evaluateMessage(ctx, message)
+	result := b.evaluateMessage(ctx, bot, message)
 	if result.Action != plugin.ActionBlock {
 		return nil
 	}
@@ -118,13 +133,15 @@ func (b *Bot) processMessage(ctx context.Context, bot *tgbotapifx.Bot, message *
 	return nil
 }
 
-func (b *Bot) evaluateMessage(ctx context.Context, message *tgbotapi.Message) plugin.Result {
+func (b *Bot) evaluateMessage(ctx context.Context, bot *tgbotapifx.Bot, message *tgbotapi.Message) plugin.Result {
+	const pluginName = "bot"
+
 	if message.From == nil {
 		return plugin.Result{
 			Action:   plugin.ActionSkip,
 			Reason:   "message from is nil",
 			Metadata: nil,
-			Plugin:   "bot",
+			Plugin:   pluginName,
 		}
 	}
 	if message.From.ID == b.config.AdminID {
@@ -132,13 +149,32 @@ func (b *Bot) evaluateMessage(ctx context.Context, message *tgbotapi.Message) pl
 			Action:   plugin.ActionAllow,
 			Reason:   "message from admin",
 			Metadata: nil,
-			Plugin:   "bot",
+			Plugin:   pluginName,
 		}
 	}
 
 	chatID := int64(0)
 	if message.Chat != nil {
 		chatID = message.Chat.ID
+	}
+
+	var media *plugin.Media
+	if b.censor.NeedMedia() {
+		var err error
+		media, err = b.downloadMedia(ctx, bot, message)
+		if err != nil {
+			// A failed download is a transport problem, not a moderation
+			// decision: the message is neither deleted nor counted as a
+			// violation, so a sender is never punished for it.
+			b.logger.Error("error downloading media", zap.Error(err))
+
+			return plugin.Result{
+				Action:   plugin.ActionSkip,
+				Reason:   "error downloading media",
+				Metadata: nil,
+				Plugin:   pluginName,
+			}
+		}
 	}
 
 	result := b.censor.Evaluate(
@@ -162,10 +198,68 @@ func (b *Bot) evaluateMessage(ctx context.Context, message *tgbotapi.Message) pl
 				}
 				return nil
 			}(),
+
+			Media: media,
 		},
 	)
 
 	return result
+}
+
+func (b *Bot) downloadMedia(
+	ctx context.Context,
+	bot *tgbotapifx.Bot,
+	message *tgbotapi.Message,
+) (*plugin.Media, error) {
+	if len(message.Photo) == 0 {
+		return nil, nil //nolint:nilnil // empty result case
+	}
+
+	photo := selectPhotoSize(message.Photo, b.config.Media.MaxBytes)
+	if photo == nil {
+		b.logger.Warn("no photo variant fits the media limit",
+			zap.Int("variants", len(message.Photo)),
+			zap.Int64("limit_bytes", b.config.Media.MaxBytes),
+		)
+
+		return nil, fmt.Errorf(
+			"%w: %d variants, limit %d bytes",
+			ErrMediaDownloadFailed,
+			len(message.Photo),
+			b.config.Media.MaxBytes,
+		)
+	}
+
+	// The download gets its own budget: this deadline is one term of the per-message
+	// worst case media.timeout + censor.Timeout.
+	downloadCtx, cancel := context.WithTimeout(ctx, b.config.Media.Timeout)
+	defer cancel()
+
+	buffer := bytes.NewBuffer(nil)
+	if err := bot.DownloadFile(downloadCtx, photo.FileID, buffer, b.config.Media.MaxBytes); err != nil {
+		return nil, fmt.Errorf("error downloading file: %w", err)
+	}
+
+	data := buffer.Bytes()
+
+	contentType := http.DetectContentType(data)
+	if !strings.HasPrefix(contentType, imageContentTypePrefix) {
+		b.logger.Warn("downloaded media is not an image",
+			zap.String("content_type", contentType),
+			zap.Int("size_bytes", buffer.Len()),
+		)
+
+		return nil, fmt.Errorf("%w: detected %s", ErrMediaDownloadFailed, contentType)
+	}
+
+	sum := sha256.Sum256(data)
+
+	return &plugin.Media{
+		Bytes:       data,
+		ContentType: contentType,
+		SizeBytes:   len(data),
+		SHA256:      hex.EncodeToString(sum[:]),
+	}, nil
 }
 
 func (b *Bot) notifyAdmins(bot *tgbotapifx.Bot, message string) error {
