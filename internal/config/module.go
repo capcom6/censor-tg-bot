@@ -30,6 +30,11 @@ func Module() fx.Option {
 			return bot.Config{
 				AdminID:      cfg.Bot.AdminID,
 				BanThreshold: cfg.Bot.BanThreshold,
+
+				Media: bot.MediaConfig{
+					MaxBytes: cfg.Bot.Media.MaxBytes,
+					Timeout:  cfg.Bot.Media.Timeout,
+				},
 			}
 		}),
 		fx.Provide(func(cfg Config) censor.Config {

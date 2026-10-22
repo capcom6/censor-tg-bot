@@ -149,6 +149,8 @@ The application loads configuration from environment variables (via `.env` file)
 | `BOT__ADMIN_ID`        | **Yes**  | —                         | Telegram user ID of the administrator                     |
 | `TELEGRAM__TOKEN`      | **Yes**  | —                         | Bot token from [@BotFather](https://t.me/BotFather)       |
 | `BOT__BAN_THRESHOLD`   | No       | `3`                       | Number of violations before automatic ban                 |
+| `BOT__MEDIA__MAX_BYTES` | No       | `10485760`                | Maximum size of a downloaded photo (10 MiB)               |
+| `BOT__MEDIA__TIMEOUT`  | No       | `5s`                      | Deadline for a single photo download                      |
 | `CENSOR__BLACKLIST`    | No       | —                         | Comma-separated blacklist (deprecated, use YAML)          |
 | `CENSOR__ENABLED_ONLY` | No       | `true`                    | Only run plugins marked as enabled                        |
 | `CENSOR__ERROR_ACTION` | No       | `block`                   | Default action when a plugin errors (`block` or `allow`)  |
@@ -171,6 +173,11 @@ Create a `config.yml` file and set the `CONFIG_PATH` environment variable to loa
 telegram:
   proxy_url: "socks5://user:pass@127.0.0.1:1080"
   timeout: "30s"
+
+bot:
+  media:
+    max_bytes: 10485760 # maximum size of a downloaded photo (10 MiB)
+    timeout: 5s # deadline for a single photo download
 
 censor:
   strategy: sequential
@@ -307,6 +314,8 @@ Blocks forwarded messages from non-exception sources. Only messages forwarded fr
 
 Detects and blocks repetitive messages from a user within a time window. Messages are normalized (lowercased, whitespace-collapsed) before comparison.
 
+Photos are compared by the SHA-256 digest of their content, so the same picture is detected even when its caption changes. The photo is downloaded once per message and counted under its own key, next to the text.
+
 | Config Key       | Type     | Default | Valid Range   | Description                                    |
 | ---------------- | -------- | ------- | ------------- | ---------------------------------------------- |
 | `max_duplicates` | `int`    | `1`     | `>= 0`        | Max duplicate messages allowed before blocking |
@@ -332,6 +341,8 @@ Blocks or allows messages based on user IDs. Whitelisted users are always allowe
 #### LLM Plugin
 
 Blocks messages containing potentially inappropriate content, spam, or violations by analyzing the message with an external LLM API. Supports response caching (LRU eviction) to reduce API costs.
+
+Photos are sent to the model as an image next to the caption, so a picture is evaluated even when it carries no text. The cache key contains the digest of the photo, so the same caption with a different image is a new request.
 
 | Config Key             | Type     | Default                             | Valid Range   | Description                       |
 | ---------------------- | -------- | ----------------------------------- | ------------- | --------------------------------- |
