@@ -163,17 +163,7 @@ func (b *Bot) evaluateMessage(ctx context.Context, bot *tgbotapifx.Bot, message 
 		var err error
 		media, err = b.downloadMedia(ctx, bot, message)
 		if err != nil {
-			// A failed download is a transport problem, not a moderation
-			// decision: the message is neither deleted nor counted as a
-			// violation, so a sender is never punished for it.
 			b.logger.Error("error downloading media", zap.Error(err))
-
-			return plugin.Result{
-				Action:   plugin.ActionSkip,
-				Reason:   "error downloading media",
-				Metadata: nil,
-				Plugin:   pluginName,
-			}
 		}
 	}
 
