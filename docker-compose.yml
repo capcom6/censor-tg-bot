@@ -5,6 +5,4 @@ services:
       dockerfile: Dockerfile
     environment:
       - TELEGRAM__TOKEN=${TELEGRAM__TOKEN}
-      - TELEGRAM__ADMIN_ID=${TELEGRAM__ADMIN_ID}
-      - CENSOR__BLACKLIST=${CENSOR__BLACKLIST}
-
+      - BOT__ADMIN_ID=${BOT__ADMIN_ID}
