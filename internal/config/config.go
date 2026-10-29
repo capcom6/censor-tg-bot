@@ -13,6 +13,13 @@ import (
 type Bot struct {
 	AdminID      int64 `koanf:"admin_id"`
 	BanThreshold uint8 `koanf:"ban_threshold"`
+
+	Media botMedia `koanf:"media"`
+}
+
+type botMedia struct {
+	MaxBytes int64         `koanf:"max_bytes"`
+	Timeout  time.Duration `koanf:"timeout"`
 }
 
 type telegram struct {
@@ -59,10 +66,15 @@ type Config struct {
 }
 
 func Default() Config {
-	//nolint:exhaustruct,mnd // default values
+	//nolint:exhaustruct_v5,mnd // default values
 	return Config{
 		Bot: Bot{
 			BanThreshold: 3,
+
+			Media: botMedia{
+				MaxBytes: 10 * 1024 * 1024,
+				Timeout:  5 * time.Second,
+			},
 		},
 		Telegram: telegram{
 			Token:    "",
