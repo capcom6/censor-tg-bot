@@ -33,6 +33,8 @@ type Message struct {
 	IsEdit              bool   // Whether this is an edited message
 	ForwardedFromUserID *int64 // User ID of original message author (if forwarded)
 	ForwardedFromChatID *int64 // Chat ID where original message was sent (if forwarded)
+
+	Media *Media // Downloaded media content
 }
 
 // Metadata contains information about a plugin.
@@ -45,6 +47,9 @@ type Metadata struct {
 type Plugin interface {
 	// Name returns the unique identifier for this plugin
 	Name() string
+
+	// Capabilities returns the capabilities of the plugin
+	Capabilities() Capability
 
 	// Evaluate inspects a message and returns a decision
 	Evaluate(ctx context.Context, msg Message) (Result, error)
