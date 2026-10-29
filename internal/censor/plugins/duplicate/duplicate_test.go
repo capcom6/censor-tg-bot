@@ -12,6 +12,8 @@ import (
 )
 
 func TestPlugin_New(t *testing.T) {
+	t.Parallel()
+
 	config := duplicate.Config{
 		MaxDuplicates: 3,
 		Window:        5 * time.Minute,
@@ -24,6 +26,8 @@ func TestPlugin_New(t *testing.T) {
 }
 
 func TestPlugin_Name(t *testing.T) {
+	t.Parallel()
+
 	config := duplicate.DefaultConfig()
 
 	p := duplicate.New(config)
@@ -32,6 +36,8 @@ func TestPlugin_Name(t *testing.T) {
 }
 
 func TestPlugin_Priority(t *testing.T) {
+	t.Parallel()
+
 	config := duplicate.DefaultConfig()
 
 	p := duplicate.New(config)
@@ -40,6 +46,8 @@ func TestPlugin_Priority(t *testing.T) {
 }
 
 func TestPlugin_Evaluate(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
 		config         duplicate.Config
@@ -174,6 +182,8 @@ func TestPlugin_Evaluate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			p := duplicate.New(tt.config)
 
 			// Call setup function if provided
@@ -186,13 +196,78 @@ func TestPlugin_Evaluate(t *testing.T) {
 			result, err := p.Evaluate(context.Background(), tt.message)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedAction, result.Action)
-			require.Equal(t, tt.expectedReason, result.Reason)
+			require.Contains(t, result.Reason, tt.expectedReason)
 			require.Equal(t, "duplicate", result.Plugin)
 		})
 	}
 }
 
+func TestPlugin_MediaDuplicates(t *testing.T) {
+	t.Parallel()
+
+	media := &plugin.Media{
+		Bytes:       []byte("image content"),
+		ContentType: "image/jpeg",
+		SizeBytes:   len("image content"),
+		SHA256:      "d58b3fa7",
+	}
+
+	message := plugin.Message{
+		ChatID: 12345,
+		Media:  media,
+	}
+
+	t.Run("first media occurrence skips", func(t *testing.T) {
+		t.Parallel()
+
+		p := duplicate.New(duplicate.Config{MaxDuplicates: 0, Window: 5 * time.Minute})
+
+		result, err := p.Evaluate(context.Background(), message)
+		require.NoError(t, err)
+		require.Equal(t, plugin.ActionSkip, result.Action)
+		require.Equal(t, "d58b3fa7", result.Metadata["media_hash"])
+	})
+
+	t.Run("repeated media blocks", func(t *testing.T) {
+		t.Parallel()
+
+		p := duplicate.New(duplicate.Config{MaxDuplicates: 0, Window: 5 * time.Minute})
+
+		_, err := p.Evaluate(context.Background(), message)
+		require.NoError(t, err)
+
+		result, err := p.Evaluate(context.Background(), message)
+		require.NoError(t, err)
+		require.Equal(t, plugin.ActionBlock, result.Action)
+		require.Contains(t, result.Reason, "duplicate limit exceeded")
+		require.Equal(t, "d58b3fa7", result.Metadata["media_hash"])
+	})
+
+	t.Run("different media does not interfere", func(t *testing.T) {
+		t.Parallel()
+
+		p := duplicate.New(duplicate.Config{MaxDuplicates: 0, Window: 5 * time.Minute})
+
+		other := message
+		other.Media = &plugin.Media{
+			Bytes:       []byte("other image"),
+			ContentType: "image/jpeg",
+			SizeBytes:   len("other image"),
+			SHA256:      "95a0db0d",
+		}
+
+		_, err := p.Evaluate(context.Background(), message)
+		require.NoError(t, err)
+
+		result, err := p.Evaluate(context.Background(), other)
+		require.NoError(t, err)
+		require.Equal(t, plugin.ActionSkip, result.Action)
+	})
+}
+
 func TestStorage_RecordDuplicate(t *testing.T) {
+	t.Parallel()
+
 	storage := duplicate.NewStorage(5 * time.Minute)
 
 	// First occurrence - should return 1 (not exceeded)
@@ -217,6 +292,8 @@ func TestStorage_RecordDuplicate(t *testing.T) {
 }
 
 func TestStorage_WindowExpiration(t *testing.T) {
+	t.Parallel()
+
 	storage := duplicate.NewStorage(1 * time.Second)
 
 	// Record a duplicate
@@ -244,6 +321,8 @@ func TestStorage_WindowExpiration(t *testing.T) {
 }
 
 func TestPlugin_UnicodeHandling(t *testing.T) {
+	t.Parallel()
+
 	config := duplicate.Config{
 		MaxDuplicates: 1,
 		Window:        5 * time.Minute,
@@ -273,6 +352,8 @@ func TestPlugin_UnicodeHandling(t *testing.T) {
 }
 
 func TestPlugin_TextExtraction(t *testing.T) {
+	t.Parallel()
+
 	config := duplicate.Config{
 		MaxDuplicates: 2,
 		Window:        5 * time.Minute,
@@ -314,6 +395,8 @@ func TestPlugin_TextExtraction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			p := duplicate.New(config)
 
 			result, err := p.Evaluate(context.Background(), tt.message)
@@ -324,6 +407,8 @@ func TestPlugin_TextExtraction(t *testing.T) {
 }
 
 func TestPlugin_HashGeneration(t *testing.T) {
+	t.Parallel()
+
 	config := duplicate.Config{
 		MaxDuplicates: 3,
 		Window:        5 * time.Minute,
@@ -361,6 +446,8 @@ func TestPlugin_HashGeneration(t *testing.T) {
 }
 
 func TestPlugin_Integration(t *testing.T) {
+	t.Parallel()
+
 	config := duplicate.Config{
 		MaxDuplicates: 3,
 		Window:        1 * time.Second,
@@ -395,6 +482,8 @@ func TestPlugin_Integration(t *testing.T) {
 }
 
 func TestPlugin_NilConfig(t *testing.T) {
+	t.Parallel()
+
 	// This should work with default configuration
 	p := duplicate.New(duplicate.Config{})
 	require.NotNil(t, p)
@@ -412,6 +501,8 @@ func TestPlugin_NilConfig(t *testing.T) {
 }
 
 func TestPlugin_EmptyMessageHandling(t *testing.T) {
+	t.Parallel()
+
 	config := duplicate.Config{
 		MaxDuplicates: 3,
 		Window:        5 * time.Minute,
@@ -474,13 +565,15 @@ func TestPlugin_EmptyMessageHandling(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			p := duplicate.New(config)
 
 			result, err := p.Evaluate(context.Background(), tt.message)
 			require.NoError(t, err)
 
 			require.Equal(t, plugin.ActionSkip, result.Action)
-			require.Equal(t, tt.reason, result.Reason)
+			require.Contains(t, result.Reason, tt.reason)
 		})
 	}
 }

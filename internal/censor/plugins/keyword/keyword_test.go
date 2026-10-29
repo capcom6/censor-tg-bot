@@ -10,6 +10,8 @@ import (
 )
 
 func TestPlugin_Evaluate(t *testing.T) {
+	t.Parallel()
+
 	p := keyword.New(keyword.Config{
 		Blacklist: []string{"spam", "scam"},
 	})
@@ -26,6 +28,8 @@ func TestPlugin_Evaluate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result, err := p.Evaluate(context.Background(), tt.message)
 			require.NoError(t, err)
 			require.Equal(t, tt.expected, result.Action)

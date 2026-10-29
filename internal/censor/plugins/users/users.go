@@ -55,6 +55,10 @@ func (p *Plugin) Name() string {
 	return "users"
 }
 
+func (p *Plugin) Capabilities() plugin.Capability {
+	return plugin.CapabilityText
+}
+
 // Priority returns the plugin execution priority.
 func (p *Plugin) Priority() int {
 	// Default priority is 5, which runs before content-based checks

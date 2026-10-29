@@ -11,7 +11,7 @@ const (
 	// DefaultBaseURL is the default base URL for the LLM API.
 	DefaultBaseURL = "https://openrouter.ai/api/v1"
 	// DefaultModel is the default LLM model.
-	DefaultModel = "nvidia/nemotron-nano-9b-v2:free"
+	DefaultModel = "nvidia/nemotron-3.5-super-vl:free"
 	// DefaultConfidenceThreshold is the default confidence threshold for blocking messages.
 	DefaultConfidenceThreshold = 0.8
 	// DefaultTimeout is the default timeout for LLM API calls.

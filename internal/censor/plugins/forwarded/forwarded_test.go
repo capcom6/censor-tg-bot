@@ -10,18 +10,24 @@ import (
 )
 
 func TestPlugin_Name(t *testing.T) {
+	t.Parallel()
+
 	config, _ := forwarded.NewConfig(map[string]any{})
 	p := forwarded.New(config)
 	require.Equal(t, "forwarded", p.Name())
 }
 
 func TestPlugin_Priority(t *testing.T) {
+	t.Parallel()
+
 	config, _ := forwarded.NewConfig(map[string]any{})
 	p := forwarded.New(config)
 	require.Equal(t, 15, p.Priority())
 }
 
 func TestPlugin_Evaluate(t *testing.T) {
+	t.Parallel()
+
 	allowedUserID := int64(12345)
 	allowedChatID := int64(-1001234567890)
 
@@ -129,6 +135,8 @@ func TestPlugin_Evaluate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			p := forwarded.New(tt.config)
 			result, err := p.Evaluate(context.Background(), tt.message)
 
@@ -164,6 +172,8 @@ func TestPlugin_Evaluate(t *testing.T) {
 }
 
 func TestConfig_NewConfig(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		input   map[string]any
@@ -240,6 +250,8 @@ func TestConfig_NewConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result, err := forwarded.NewConfig(tt.input)
 
 			if tt.wantErr {

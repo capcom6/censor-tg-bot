@@ -2,6 +2,9 @@ package llm
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +16,15 @@ import (
 	"github.com/openai/openai-go/v3/option"
 )
 
+const (
+	// mediaOnlyText is the text of a message that carries only media.
+	mediaOnlyText = "(image only, no text)"
+	// imageDetailAuto lets the provider choose the fidelity of the image.
+	imageDetailAuto = "auto"
+	// defaultMediaContentType is used when the media carries no content type.
+	defaultMediaContentType = "image/jpeg"
+)
+
 type Response struct {
 	Inappropriate bool    `json:"inappropriate" description:"Whether the message is inappropriate" required:"true"`
 	Confidence    float64 `json:"confidence"    description:"Confidence level of the response"     required:"true"`
@@ -20,8 +32,8 @@ type Response struct {
 }
 
 type Cache interface {
-	SetBy(text, model, prompt string, resp *Response)
-	GetBy(text, model, prompt string) (*Response, bool)
+	SetBy(text, model, prompt, mediaHash string, resp *Response)
+	GetBy(text, model, prompt, mediaHash string) (*Response, bool)
 	Cleanup()
 }
 
@@ -86,6 +98,10 @@ func (p *Plugin) Name() string {
 	return "llm"
 }
 
+func (p *Plugin) Capabilities() plugin.Capability {
+	return plugin.CapabilityText | plugin.CapabilityMedia
+}
+
 func (p *Plugin) Priority() int {
 	const priority = 250
 	return priority
@@ -97,7 +113,8 @@ func (p *Plugin) Evaluate(ctx context.Context, msg plugin.Message) (plugin.Resul
 		text = msg.Caption
 	}
 
-	if text == "" {
+	media := msg.Media
+	if text == "" && media == nil {
 		return plugin.Result{
 			Action:   plugin.ActionSkip,
 			Reason:   "empty message",
@@ -106,12 +123,20 @@ func (p *Plugin) Evaluate(ctx context.Context, msg plugin.Message) (plugin.Resul
 		}, nil
 	}
 
+	if text == "" {
+		text = mediaOnlyText
+	}
+
 	// Prepare message for LLM analysis
 	prompt := p.buildPrompt(text)
 
+	// The media identity is part of the cache key, so the same caption with a
+	// different image is a different request.
+	mediaHash := mediaDigest(media)
+
 	// Check cache first
 	if p.config.CacheEnabled {
-		if cachedResp, found := p.cache.GetBy(text, p.config.Model, p.config.Prompt); found {
+		if cachedResp, found := p.cache.GetBy(text, p.config.Model, p.config.Prompt, mediaHash); found {
 			result := p.evaluateResponse(cachedResp)
 			result.Metadata["cached"] = true
 			return result, nil
@@ -119,14 +144,14 @@ func (p *Plugin) Evaluate(ctx context.Context, msg plugin.Message) (plugin.Resul
 	}
 
 	// Cache miss - call API
-	llmResponse, err := p.callLLMAPI(ctx, prompt)
+	llmResponse, err := p.callLLMAPI(ctx, prompt, media)
 	if err != nil {
 		return plugin.Result{}, err
 	}
 
 	// Store in cache
 	if p.config.CacheEnabled {
-		p.cache.SetBy(text, p.config.Model, p.config.Prompt, llmResponse)
+		p.cache.SetBy(text, p.config.Model, p.config.Prompt, mediaHash, llmResponse)
 	}
 
 	result := p.evaluateResponse(llmResponse)
@@ -157,14 +182,14 @@ func (p *Plugin) evaluateResponse(response *Response) plugin.Result {
 	}
 }
 
-func (p *Plugin) callLLMAPI(ctx context.Context, prompt string) (*Response, error) {
+func (p *Plugin) callLLMAPI(ctx context.Context, prompt string, media *plugin.Media) (*Response, error) {
 	ctx, cancel := context.WithTimeout(ctx, p.config.Timeout)
 	defer cancel()
 
 	res, err := p.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Model: p.config.Model,
 		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.UserMessage(prompt),
+			buildUserMessage(prompt, media),
 		},
 		ResponseFormat: openai.ChatCompletionNewParamsResponseFormatUnion{
 			OfJSONSchema: &openai.ResponseFormatJSONSchemaParam{
@@ -205,6 +230,50 @@ func (p *Plugin) callLLMAPI(ctx context.Context, prompt string) (*Response, erro
 
 func (p *Plugin) buildPrompt(text string) string {
 	return fmt.Sprintf("%s\n\nMessage to analyze:\n%q", p.config.Prompt, text)
+}
+
+// buildUserMessage builds the user message of the request.
+//
+// A message that carries media attaches the image as a data URL next to the
+// prompt, so the model evaluates the image and not only the caption.
+func buildUserMessage(prompt string, media *plugin.Media) openai.ChatCompletionMessageParamUnion {
+	if media == nil || len(media.Bytes) == 0 {
+		return openai.UserMessage(prompt)
+	}
+
+	return openai.UserMessage([]openai.ChatCompletionContentPartUnionParam{
+		openai.TextContentPart(prompt),
+		openai.ImageContentPart(openai.ChatCompletionContentPartImageImageURLParam{
+			URL:    mediaDataURL(media),
+			Detail: imageDetailAuto,
+		}),
+	})
+}
+
+// mediaDataURL encodes the media content as a base64 data URL.
+func mediaDataURL(media *plugin.Media) string {
+	contentType := media.ContentType
+	if contentType == "" {
+		contentType = defaultMediaContentType
+	}
+
+	return "data:" + contentType + ";base64," + base64.StdEncoding.EncodeToString(media.Bytes)
+}
+
+// mediaDigest returns the identity of the media content, or an empty string when
+// the message carries no media.
+func mediaDigest(media *plugin.Media) string {
+	if media == nil {
+		return ""
+	}
+
+	if media.SHA256 != "" {
+		return media.SHA256
+	}
+
+	sum := sha256.Sum256(media.Bytes)
+
+	return hex.EncodeToString(sum[:])
 }
 
 func (p *Plugin) Cleanup(_ context.Context) {

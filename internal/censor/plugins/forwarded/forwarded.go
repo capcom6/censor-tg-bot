@@ -35,6 +35,10 @@ func (p *Plugin) Name() string {
 	return "forwarded"
 }
 
+func (p *Plugin) Capabilities() plugin.Capability {
+	return plugin.CapabilityText
+}
+
 func (p *Plugin) Priority() int {
 	const priority = 15
 	return priority

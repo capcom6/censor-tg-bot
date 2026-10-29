@@ -9,6 +9,8 @@ import (
 )
 
 func TestConfig_NewConfig(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		config  map[string]any
@@ -62,6 +64,8 @@ func TestConfig_NewConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got, err := duplicate.NewConfig(tt.config)
 			if tt.wantErr {
 				require.Error(t, err)
@@ -74,6 +78,8 @@ func TestConfig_NewConfig(t *testing.T) {
 }
 
 func TestConfig_DefaultConfig(t *testing.T) {
+	t.Parallel()
+
 	config := duplicate.DefaultConfig()
 
 	require.Equal(t, 1, config.MaxDuplicates)
@@ -84,6 +90,8 @@ func TestConfig_DefaultConfig(t *testing.T) {
 }
 
 func TestConfig_Validate(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		config  duplicate.Config
@@ -149,6 +157,8 @@ func TestConfig_Validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := tt.config.Validate()
 			if tt.wantErr {
 				require.Error(t, err)
