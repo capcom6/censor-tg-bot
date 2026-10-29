@@ -9,6 +9,8 @@ import (
 )
 
 func TestNew(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		config  storage.Config
@@ -53,6 +55,8 @@ func TestNew(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			_, err := storage.New(tt.config)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
@@ -63,12 +67,18 @@ func TestNew(t *testing.T) {
 }
 
 func TestStorage_GetOrSet(t *testing.T) {
+	t.Parallel()
+
 	s, initErr := storage.New(storage.Config{URL: "memory://storage?ttl=1h"})
 	if initErr != nil {
 		t.Fatalf("Failed to create storage: %v", initErr)
 	}
 
+	// Each subtest uses its own key so that the subtests stay independent of
+	// each other and can run in parallel.
 	t.Run("Set new key", func(t *testing.T) {
+		t.Parallel()
+
 		count, err := s.GetOrSet("key1")
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
@@ -79,7 +89,13 @@ func TestStorage_GetOrSet(t *testing.T) {
 	})
 
 	t.Run("Get existing key", func(t *testing.T) {
-		count, err := s.GetOrSet("key1")
+		t.Parallel()
+
+		if _, err := s.GetOrSet("key2"); err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+
+		count, err := s.GetOrSet("key2")
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -89,8 +105,10 @@ func TestStorage_GetOrSet(t *testing.T) {
 	})
 
 	t.Run("Multiple increments", func(t *testing.T) {
-		for i := 3; i <= 5; i++ {
-			count, err := s.GetOrSet("key1")
+		t.Parallel()
+
+		for i := 1; i <= 3; i++ {
+			count, err := s.GetOrSet("key3")
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -101,8 +119,10 @@ func TestStorage_GetOrSet(t *testing.T) {
 	})
 
 	t.Run("Different keys", func(t *testing.T) {
-		count1, _ := s.GetOrSet("key2")
-		count2, _ := s.GetOrSet("key3")
+		t.Parallel()
+
+		count1, _ := s.GetOrSet("key4")
+		count2, _ := s.GetOrSet("key5")
 
 		if count1 != 1 || count2 != 1 {
 			t.Errorf("Expected both counts to be 1, got %d and %d", count1, count2)
@@ -111,12 +131,16 @@ func TestStorage_GetOrSet(t *testing.T) {
 }
 
 func TestStorage_GetOrSet_Expiration(t *testing.T) {
+	t.Parallel()
+
 	s, initErr := storage.New(storage.Config{URL: "memory://storage?ttl=1ms"})
 	if initErr != nil {
 		t.Fatalf("Failed to create storage: %v", initErr)
 	}
 
 	t.Run("Expired key", func(t *testing.T) {
+		t.Parallel()
+
 		_, _ = s.GetOrSet("expiring_key")
 		time.Sleep(150 * time.Millisecond) // Wait for the key to expire
 		count, err := s.GetOrSet("expiring_key")

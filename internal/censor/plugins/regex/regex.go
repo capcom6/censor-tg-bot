@@ -31,6 +31,10 @@ func New(config Config) (plugin.Plugin, error) {
 	}, nil
 }
 
+func (p *Plugin) Capabilities() plugin.Capability {
+	return plugin.CapabilityText
+}
+
 func (p *Plugin) Name() string {
 	return "regex"
 }

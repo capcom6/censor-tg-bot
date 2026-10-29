@@ -66,6 +66,7 @@ A plugin system lets you choose which checks to run, in what order, and whether 
   - **Duplicate** — detect and block repeated messages from a user
   - **Users** — blacklist/whitelist specific user IDs
   - **LLM** — analyze message content via an external LLM API
+- **Photo moderation** — photos are downloaded once per message; the duplicate plugin compares SHA-256 digests and the LLM plugin sends the image to the model. The configured model must support image input: with a text-only model the photo request fails and the message falls back to `CENSOR__ERROR_ACTION` (default `block`)
 - **Sequential or parallel** execution strategies
 - **Automatic user banning** after configurable violation threshold
 - **Admin notifications** — real-time alerts with plugin details for blocked messages and bans
@@ -78,6 +79,7 @@ A plugin system lets you choose which checks to run, in what order, and whether 
 
 - [Go](https://go.dev/)
 - [telegram-bot-api](https://github.com/go-telegram-bot-api/telegram-bot-api) — Telegram Bot API wrapper
+- [openai-go](https://github.com/openai/openai-go) — OpenAI-compatible API client for the LLM plugin
 - [fx](https://uber-go.github.io/fx/) — dependency injection
 - [Fiber](https://gofiber.io/) — HTTP server for metrics endpoint
 - [Prometheus](https://prometheus.io/) — metrics and monitoring
@@ -88,7 +90,7 @@ A plugin system lets you choose which checks to run, in what order, and whether 
 
 ### Prerequisites
 
-- Go 1.25+ (for building from source)
+- Go 1.25.5+ (for building from source)
 - Docker (for containerized deployment)
 - Prometheus & Grafana (optional, for monitoring)
 
@@ -99,6 +101,7 @@ A plugin system lets you choose which checks to run, in what order, and whether 
 ```sh
 docker run -d --name censor-tg-bot \
   --env-file .env \
+  -v "$(pwd)/configs:/app/configs:ro" \
   ghcr.io/capcom6/censor-tg-bot
 ```
 
@@ -109,8 +112,12 @@ services:
   bot:
     image: ghcr.io/capcom6/censor-tg-bot
     env_file: .env
+    volumes:
+      - ./configs:/app/configs:ro
     restart: unless-stopped
 ```
+
+Both examples mount the host `configs` directory into the container working directory (`/app`), so `CONFIG_PATH=configs/config.yml` resolves inside the container. A file that is not mounted is silently ignored at startup.
 
 #### From Source
 
@@ -123,7 +130,7 @@ go build -o censor-tg-bot .
 
 ## Usage
 
-Create a `.env` file with your bot token and admin ID, then run the bot.
+Copy [`.env.example`](.env.example) to `.env`, then set your bot token and admin ID.
 
 The bot will process messages in groups where it has admin permissions. Blocked messages are deleted, the admin is notified with plugin details, and repeat offenders are automatically banned after exceeding the configured threshold.
 
@@ -140,28 +147,30 @@ make build
 
 ## Configuration
 
-The application loads configuration from environment variables (via `.env` file) and optionally from a YAML file specified by the `CONFIG_PATH` environment variable.
+The application loads configuration from environment variables (via `.env` file) and optionally from a YAML file specified by the `CONFIG_PATH` environment variable. Sources are merged with process environment variables taking precedence over `.env` values, which in turn override the YAML file.
 
 ### Environment Variables
 
-| Variable               | Required | Default                   | Description                                               |
-| ---------------------- | -------- | ------------------------- | --------------------------------------------------------- |
-| `BOT__ADMIN_ID`        | **Yes**  | —                         | Telegram user ID of the administrator                     |
-| `TELEGRAM__TOKEN`      | **Yes**  | —                         | Bot token from [@BotFather](https://t.me/BotFather)       |
-| `BOT__BAN_THRESHOLD`   | No       | `3`                       | Number of violations before automatic ban                 |
-| `CENSOR__BLACKLIST`    | No       | —                         | Comma-separated blacklist (deprecated, use YAML)          |
-| `CENSOR__ENABLED_ONLY` | No       | `true`                    | Only run plugins marked as enabled                        |
-| `CENSOR__ERROR_ACTION` | No       | `block`                   | Default action when a plugin errors (`block` or `allow`)  |
-| `CENSOR__SKIP_ACTION`  | No       | `allow`                   | Default action when all plugins skip (`block` or `allow`) |
-| `CENSOR__STRATEGY`     | No       | `sequential`              | Execution strategy (`sequential` or `parallel`)           |
-| `CENSOR__TIMEOUT`      | No       | `30s`                     | Per-plugin execution timeout                              |
-| `CONFIG_PATH`          | No       | —                         | Path to YAML configuration file                           |
-| `HTTP__ADDRESS`        | No       | `127.0.0.1:3000`          | Metrics endpoint address                                  |
-| `HTTP__PROXIES`        | No       | —                         | Comma-separated list of trusted proxy IPs                 |
-| `HTTP__PROXY_HEADER`   | No       | `X-Forwarded-For`         | Proxy header for trusted proxies                          |
-| `STORAGE__URL`         | No       | `memory://storage?ttl=5m` | Storage backend URL (in-memory with TTL)                  |
-| `TELEGRAM__PROXY_URL`  | No       | —                         | SOCKS5 proxy URL                                          |
-| `TELEGRAM__TIMEOUT`    | No       | `60s`                     | Timeout for Telegram API requests                         |
+| Variable                | Required | Default                   | Description                                                                                                 |
+| ----------------------- | -------- | ------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `BOT__ADMIN_ID`         | **Yes**  | —                         | Telegram user ID of the administrator                                                                       |
+| `TELEGRAM__TOKEN`       | **Yes**  | —                         | Bot token from [@BotFather](https://t.me/BotFather)                                                         |
+| `BOT__BAN_THRESHOLD`    | No       | `3`                       | Number of violations before automatic ban                                                                   |
+| `BOT__MEDIA__MAX_BYTES` | No       | `10485760`                | Maximum size of a downloaded photo (10 MiB)                                                                 |
+| `BOT__MEDIA__TIMEOUT`   | No       | `5s`                      | Photo content download deadline (file metadata lookup uses `TELEGRAM__TIMEOUT`)                             |
+| `CENSOR__ENABLED_ONLY`  | No       | `true`                    | Only run plugins marked as enabled                                                                          |
+| `CENSOR__ERROR_ACTION`  | No       | `block`                   | Default action when a plugin errors (`block` or `allow`)                                                    |
+| `CENSOR__SKIP_ACTION`   | No       | `allow`                   | Default action when all plugins skip (`block` or `allow`)                                                   |
+| `CENSOR__STRATEGY`      | No       | `sequential`              | Execution strategy (`sequential` or `parallel`)                                                             |
+| `CENSOR__TIMEOUT`       | No       | `30s`                     | Time budget for evaluating one message across all plugins                                                   |
+| `CONFIG_PATH`           | No       | —                         | Path to YAML configuration file                                                                             |
+| `DEBUG`                 | No       | `false`                   | Enable debug logging and Telegram API request logging (`true`)                                              |
+| `HTTP__ADDRESS`         | No       | `127.0.0.1:3000`          | Metrics endpoint address                                                                                    |
+| `HTTP__PROXIES`         | No       | —                         | Trusted proxy IPs — a single IP or a JSON array (e.g. `["127.0.0.1"]`); comma-separated lists are not split |
+| `HTTP__PROXY_HEADER`    | No       | `X-Forwarded-For`         | Proxy header for trusted proxies                                                                            |
+| `STORAGE__URL`          | No       | `memory://storage?ttl=5m` | Storage backend URL (`memory://` only, with TTL)                                                            |
+| `TELEGRAM__PROXY_URL`   | No       | —                         | SOCKS5 proxy URL                                                                                            |
+| `TELEGRAM__TIMEOUT`     | No       | `60s`                     | Timeout for Telegram API requests (raised to a `70s` minimum)                                               |
 
 ### YAML Configuration
 
@@ -170,7 +179,12 @@ Create a `config.yml` file and set the `CONFIG_PATH` environment variable to loa
 ```yaml
 telegram:
   proxy_url: "socks5://user:pass@127.0.0.1:1080"
-  timeout: "30s"
+  timeout: "90s"
+
+bot:
+  media:
+    max_bytes: 10485760 # maximum size of a downloaded photo (10 MiB)
+    timeout: 5s # deadline for a single photo download
 
 censor:
   strategy: sequential
@@ -244,7 +258,7 @@ censor:
       priority: 250
       config:
         api_key: "<your-api-key>"
-        model: "nvidia/nemotron-nano-9b-v2:free"
+        model: "nvidia/nemotron-3.5-super-vl:free"
         confidence_threshold: 0.8
         timeout: 30s
         prompt: "Analyze the following message..."
@@ -307,6 +321,8 @@ Blocks forwarded messages from non-exception sources. Only messages forwarded fr
 
 Detects and blocks repetitive messages from a user within a time window. Messages are normalized (lowercased, whitespace-collapsed) before comparison.
 
+Photos are compared by the SHA-256 digest of their content, so the same picture is detected even when its caption changes. The photo is downloaded once per message and counted under its own key, next to the text.
+
 | Config Key       | Type     | Default | Valid Range   | Description                                    |
 | ---------------- | -------- | ------- | ------------- | ---------------------------------------------- |
 | `max_duplicates` | `int`    | `1`     | `>= 0`        | Max duplicate messages allowed before blocking |
@@ -333,18 +349,20 @@ Blocks or allows messages based on user IDs. Whitelisted users are always allowe
 
 Blocks messages containing potentially inappropriate content, spam, or violations by analyzing the message with an external LLM API. Supports response caching (LRU eviction) to reduce API costs.
 
-| Config Key             | Type     | Default                             | Valid Range   | Description                       |
-| ---------------------- | -------- | ----------------------------------- | ------------- | --------------------------------- |
-| `base_url`             | `string` | `"https://openrouter.ai/api/v1"`    | —             | LLM API base URL                  |
-| `api_key`              | `string` | `""`                                | —             | API key (required)                |
-| `model`                | `string` | `"nvidia/nemotron-nano-9b-v2:free"` | —             | Model identifier                  |
-| `confidence_threshold` | `float`  | `0.8`                               | `0.0` – `1.0` | Minimum confidence to block       |
-| `timeout`              | `string` | `"30s"`                             | `5s` – `5m`   | API call timeout                  |
-| `prompt`               | `string` | *see default*                       | —             | LLM prompt                        |
-| `temperature`          | `float`  | `0.1`                               | `0.0` – `2.0` | LLM sampling temperature          |
-| `cache_enabled`        | `bool`   | `true`                              | —             | Enable response caching           |
-| `cache_ttl`            | `string` | `"1h"`                              | `1m` – `24h`  | Cache entry TTL                   |
-| `cache_max_size`       | `int`    | `1000`                              | `> 0`         | Max cached entries (LRU eviction) |
+Photos are sent to the model as an image next to the caption, so a picture is evaluated even when it carries no text. The cache key contains the digest of the photo, so the same caption with a different image is a new request.
+
+| Config Key             | Type     | Default                               | Valid Range   | Description                                 |
+| ---------------------- | -------- | ------------------------------------- | ------------- | ------------------------------------------- |
+| `base_url`             | `string` | `"https://openrouter.ai/api/v1"`      | —             | LLM API base URL                            |
+| `api_key`              | `string` | `""`                                  | —             | API key (required)                          |
+| `model`                | `string` | `"nvidia/nemotron-3.5-super-vl:free"` | —             | Model identifier (must support image input) |
+| `confidence_threshold` | `float`  | `0.8`                                 | `0.0` – `1.0` | Minimum confidence to block                 |
+| `timeout`              | `string` | `"30s"`                               | `5s` – `5m`   | API call timeout                            |
+| `prompt`               | `string` | *see default*                         | —             | LLM prompt                                  |
+| `temperature`          | `float`  | `0.1`                                 | `0.0` – `2.0` | LLM sampling temperature                    |
+| `cache_enabled`        | `bool`   | `true`                                | —             | Enable response caching                     |
+| `cache_ttl`            | `string` | `"1h"`                                | `1m` – `24h`  | Cache entry TTL                             |
+| `cache_max_size`       | `int`    | `1000`                                | `> 0`         | Max cached entries (LRU eviction)           |
 
 **Use Cases:** Filtering semantic spam that evades keyword matching, multi-language moderation, context-sensitive content filtering.
 
@@ -391,12 +409,15 @@ censor:
 
 The bot exposes metrics at `http://localhost:3000/metrics`:
 
-| Metric                               | Type      | Description                                        |
-| ------------------------------------ | --------- | -------------------------------------------------- |
-| `censor_plugin_evaluations_total`    | Counter   | Plugin evaluation counts by action                 |
-| `censor_plugin_duration_seconds`     | Histogram | Plugin execution duration                          |
-| `censor_plugin_errors_total`         | Counter   | Plugin error counts                                |
+| Metric                               | Type      | Description                                                           |
+| ------------------------------------ | --------- | --------------------------------------------------------------------- |
+| `censor_plugin_evaluations_total`    | Counter   | Plugin evaluation counts by action                                    |
+| `censor_plugin_duration_seconds`     | Histogram | Plugin execution duration                                             |
+| `censor_plugin_errors_total`         | Counter   | Plugin error counts                                                   |
+| `censor_evaluations_total`           | Counter   | Message evaluations by final decision (`allow`/`block`)               |
 | `censor_bot_processed_actions_total` | Counter   | Bot action counts (message processed, deletions, bans, notifications) |
+| `http_requests_total`                | Counter   | HTTP requests by status code                                          |
+| `http_request_duration_seconds`      | Histogram | HTTP request latency                                                  |
 
 ### Grafana Dashboard
 

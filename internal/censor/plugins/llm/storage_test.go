@@ -10,6 +10,8 @@ import (
 )
 
 func TestStorage_GetSet(t *testing.T) {
+	t.Parallel()
+
 	// Create a new storage with 10s TTL and max size of 10
 	storage := llm.NewStorage(10*time.Second, 10)
 
@@ -50,6 +52,8 @@ func TestStorage_GetSet(t *testing.T) {
 }
 
 func TestStorage_ExpiredEntry(t *testing.T) {
+	t.Parallel()
+
 	// Create a new storage with 1ms TTL and max size of 10
 	storage := llm.NewStorage(1*time.Millisecond, 10)
 
@@ -77,6 +81,8 @@ func TestStorage_ExpiredEntry(t *testing.T) {
 }
 
 func TestStorage_LRU(t *testing.T) {
+	t.Parallel()
+
 	// Create a new storage with 10s TTL and max size of 2
 	storage := llm.NewStorage(10*time.Second, 2)
 
@@ -121,6 +127,8 @@ func TestStorage_LRU(t *testing.T) {
 }
 
 func TestStorage_LRU_AccessOrder(t *testing.T) {
+	t.Parallel()
+
 	// Create a new storage with 10s TTL and max size of 2
 	storage := llm.NewStorage(10*time.Second, 2)
 
@@ -169,6 +177,8 @@ func TestStorage_LRU_AccessOrder(t *testing.T) {
 }
 
 func TestStorage_Cleanup(t *testing.T) {
+	t.Parallel()
+
 	// Create a new storage with 1ms TTL and max size of 10
 	storage := llm.NewStorage(1*time.Millisecond, 10)
 
@@ -217,6 +227,8 @@ func TestStorage_Cleanup(t *testing.T) {
 }
 
 func TestStorage_MaxSizeValidation(t *testing.T) {
+	t.Parallel()
+
 	// Test with zero max size - should be handled by config validation
 	// But we should still handle it gracefully
 	storage := llm.NewStorage(10*time.Second, 0)
@@ -241,7 +253,9 @@ func TestStorage_MaxSizeValidation(t *testing.T) {
 	}
 }
 
-func TestStorage_ConcurrentStress(_ *testing.T) {
+func TestStorage_ConcurrentStress(t *testing.T) {
+	t.Parallel()
+
 	storage := llm.NewStorage(10*time.Second, 100)
 
 	var wg sync.WaitGroup
