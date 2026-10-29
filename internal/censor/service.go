@@ -33,8 +33,9 @@ func (s ExecutionStrategy) IsValid() bool {
 
 // Service orchestrates plugin execution.
 type Service struct {
-	config  Config
-	plugins []plugin.Plugin
+	config    Config
+	plugins   []plugin.Plugin
+	needMedia bool
 
 	metrics *Metrics
 	logger  *zap.Logger
@@ -47,6 +48,10 @@ func New(plugins []plugin.Plugin, config Config, metrics *Metrics, logger *zap.L
 	return &Service{
 		config:  config,
 		plugins: plugins,
+		needMedia: lo.SomeBy(
+			plugins,
+			func(p plugin.Plugin) bool { return p.Capabilities()&plugin.CapabilityMedia != 0 },
+		),
 
 		metrics: metrics,
 		logger:  logger,
@@ -103,6 +108,10 @@ func (s *Service) GetPlugins() []plugin.Plugin {
 	})
 
 	return plugins
+}
+
+func (s *Service) NeedMedia() bool {
+	return s.needMedia
 }
 
 // Evaluate runs plugins according to the configured strategy.
