@@ -39,6 +39,10 @@ func (p *Plugin) Name() string {
 	return "ratelimit"
 }
 
+func (p *Plugin) Capabilities() plugin.Capability {
+	return plugin.CapabilityText
+}
+
 func (p *Plugin) Priority() int {
 	const priority = 5
 	return priority // Very high priority (early execution)

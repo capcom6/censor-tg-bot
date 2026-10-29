@@ -2,20 +2,27 @@ package duplicate
 
 import (
 	"context"
-	"encoding/hex"
+	"errors"
 	"fmt"
-	"hash/fnv"
-	"regexp"
-	"strings"
 
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugin"
+	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/duplicate/hashers"
+	"github.com/samber/lo"
 )
 
 const (
-	minTextLength = 3 // Minimum text length for duplicate detection
+	// textHashPrefix namespaces text hashes inside the duplicate storage.
+	textHashPrefix = "text:"
+	// mediaHashPrefix namespaces media hashes inside the duplicate storage.
+	mediaHashPrefix = "media:"
 )
 
-var multiSpaceRegex = regexp.MustCompile(`\s+`)
+// hasher computes a duplicate-detection hash for a message. Implementations
+// return an error wrapping hashers.ErrSkipped when the message has no content
+// for them to hash; such an error means "not applicable", not a failure.
+type hasher interface {
+	Hash(ctx context.Context, msg plugin.Message) (string, error)
+}
 
 func Metadata() plugin.Metadata {
 	return plugin.Metadata{
@@ -34,12 +41,19 @@ func Metadata() plugin.Metadata {
 type Plugin struct {
 	storage *Storage
 	config  Config
+
+	hashers map[string]hasher
 }
 
 func New(config Config) plugin.Plugin {
 	return &Plugin{
 		storage: NewStorage(config.Window),
 		config:  config,
+
+		hashers: map[string]hasher{
+			textHashPrefix:  hashers.NewText(),
+			mediaHashPrefix: hashers.NewMedia(),
+		},
 	}
 }
 
@@ -47,102 +61,100 @@ func (p *Plugin) Name() string {
 	return "duplicate"
 }
 
+func (p *Plugin) Capabilities() plugin.Capability {
+	return plugin.CapabilityText | plugin.CapabilityMedia
+}
+
 func (p *Plugin) Priority() int {
 	const priority = 150
 	return priority
 }
 
-func (p *Plugin) Evaluate(_ context.Context, msg plugin.Message) (plugin.Result, error) {
-	// Get the message text to analyze
-	text := p.getMessageText(msg)
+func (p *Plugin) Evaluate(ctx context.Context, msg plugin.Message) (plugin.Result, error) {
+	// Calculate max occurrences (original + allowed duplicates)
+	maxOccurrences := p.config.MaxDuplicates + 1
 
-	// Skip empty or very short messages
-	if len(text) < minTextLength {
+	hashes := map[string]string{}
+	errs := map[string]error{}
+	var stats []Entry
+	for prefix, hasher := range p.hashers {
+		hash, err := hasher.Hash(ctx, msg)
+		if err != nil {
+			errs[prefix] = err
+			continue
+		}
+
+		if hash == "" {
+			continue
+		}
+
+		hashes[prefix] = hash
+
+		// Record duplicate and check if limit exceeded
+		stat := p.storage.Record(
+			msg.ChatID,
+			prefix+hash,
+		)
+
+		stats = append(stats, stat)
+	}
+
+	skipErrs := lo.FilterValues(
+		errs,
+		func(_ string, err error) bool {
+			return errors.Is(err, hashers.ErrSkipped)
+		},
+	)
+
+	if len(skipErrs) == 0 && len(errs) == len(p.hashers) {
+		return plugin.Result{}, errors.Join(lo.Values(errs)...)
+	}
+
+	metadata := map[string]any{}
+	if textHash := hashes[textHashPrefix]; textHash != "" {
+		metadata["message_hash"] = textHash
+	}
+	if mediaHash := hashes[mediaHashPrefix]; mediaHash != "" {
+		metadata["media_hash"] = mediaHash
+	}
+
+	if len(skipErrs) == len(p.hashers) {
 		return plugin.Result{
 			Action:   plugin.ActionSkip,
-			Reason:   "message too short for duplicate detection",
-			Metadata: map[string]any{"text_length": len(text)},
+			Reason:   errors.Join(lo.Values(errs)...).Error(),
+			Metadata: metadata,
 			Plugin:   p.Name(),
 		}, nil
 	}
 
-	// Generate message hash for duplicate detection
-	messageHash, err := p.generateMessageHash(text)
-	if err != nil {
-		return plugin.Result{}, err
-	}
+	violations := lo.Filter(stats, func(stat Entry, _ int) bool {
+		return stat.Count > maxOccurrences
+	})
 
-	// Calculate max occurrences (original + allowed duplicates)
-	maxOccurrences := p.config.MaxDuplicates + 1
-
-	// Record duplicate and check if limit exceeded
-	stat := p.storage.Record(
-		msg.ChatID,
-		messageHash,
-	)
-
-	if stat.Count > maxOccurrences {
+	if len(violations) == 0 {
 		return plugin.Result{
-			Action: plugin.ActionBlock,
-			Reason: fmt.Sprintf(
-				"duplicate limit exceeded (%d occurrences, max %d allowed in %s)",
-				stat.Count,
-				maxOccurrences,
-				p.config.Window,
-			),
-			Metadata: map[string]any{
-				"count":           stat.Count,
-				"max_occurrences": maxOccurrences,
-				"window":          p.config.Window.String(),
-				"message_hash":    messageHash,
-			},
-			Plugin: p.Name(),
+			Action:   plugin.ActionSkip,
+			Reason:   "duplicate limit not exceeded",
+			Metadata: metadata,
+			Plugin:   p.Name(),
 		}, nil
 	}
 
-	// Within limits, skip to let other plugins decide
+	metadata["count"] = violations[0].Count
+	metadata["max_occurrences"] = maxOccurrences
+	metadata["window"] = p.config.Window
+
 	return plugin.Result{
-		Action: plugin.ActionSkip,
-		Reason: "duplicate limit not exceeded",
-		Metadata: map[string]any{
-			"message_hash": messageHash,
-		},
-		Plugin: p.Name(),
+		Action: plugin.ActionBlock,
+		Reason: fmt.Sprintf(
+			"duplicate limit exceeded (%d occurrences, max %d allowed in %s)",
+			violations[0].Count,
+			maxOccurrences,
+			p.config.Window,
+		),
+		Metadata: metadata,
+		Plugin:   p.Name(),
 	}, nil
-}
-
-// getMessageText extracts the primary text content from a message.
-// Prefers Text over Caption, falling back to Caption if Text is empty.
-func (p *Plugin) getMessageText(msg plugin.Message) string {
-	text := strings.TrimSpace(msg.Text)
-	if text != "" {
-		return p.normalizeText(text)
-	}
-
-	// Fallback to caption if text is empty
-	caption := strings.TrimSpace(msg.Caption)
-	if caption != "" {
-		return p.normalizeText(caption)
-	}
-	return ""
-}
-
-func (p *Plugin) normalizeText(text string) string {
-	// Convert to lowercase for case-insensitive matching
-	text = strings.ToLower(text)
-	// Collapse multiple whitespace characters to single space
-	text = multiSpaceRegex.ReplaceAllString(text, " ")
-	return strings.TrimSpace(text)
-}
-
-// generateMessageHash creates a hash for duplicate detection.
-func (p *Plugin) generateMessageHash(text string) (string, error) {
-	// Generate hash based on text content
-	hasher := fnv.New32a()
-	if _, err := hasher.Write([]byte(text)); err != nil {
-		return "", fmt.Errorf("failed to generate hash: %w", err)
-	}
-	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
 // Cleanup performs maintenance tasks for the plugin.
