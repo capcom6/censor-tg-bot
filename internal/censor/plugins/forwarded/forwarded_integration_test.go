@@ -13,6 +13,8 @@ import (
 )
 
 func TestPluginIntegration_DICompatibility(t *testing.T) {
+	t.Parallel()
+
 	// Test that the plugin can be created and used within the fx DI framework
 	var config forwarded.Config
 	var pluginInstance plugin.Plugin

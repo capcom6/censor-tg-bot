@@ -1,6 +1,11 @@
 telegram:
   proxy_url: "socks5://user:pass@127.0.0.1:1080" # optional SOCKS5 proxy
 
+bot:
+  media:
+    max_bytes: 10485760 # maximum size of a downloaded photo (10 MiB)
+    timeout: 5s # deadline for a single photo download
+
 censor:
   strategy: sequential
   timeout: 30s
@@ -78,7 +83,7 @@ censor:
       priority: 250
       config:
         api_key: "sk-1234567890"
-        model: nvidia/nemotron-nano-9b-v2:free
+        model: nvidia/nemotron-3.5-super-vl:free
         confidence_threshold: 0.8
         timeout: 30s
         prompt: 'Analyze the following message for inappropriate content, spam, or violations. Respond with JSON: {"inappropriate": boolean, "confidence": float, "reason": string}'

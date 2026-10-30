@@ -48,6 +48,10 @@ func (p *Plugin) Name() string {
 	return pluginName
 }
 
+func (p *Plugin) Capabilities() plugin.Capability {
+	return plugin.CapabilityText
+}
+
 func (p *Plugin) Priority() int {
 	const priority = 10
 	return priority // Low priority = early execution

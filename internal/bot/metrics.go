@@ -16,6 +16,7 @@ const (
 
 	MetricLabelActionMessageProcessed MetricLabelAction = "message_processed"
 	MetricLabelActionMessageDeleted   MetricLabelAction = "message_deleted"
+	MetricLabelActionMessageCopied    MetricLabelAction = "message_copied"
 	MetricLabelActionUserBanned       MetricLabelAction = "user_banned"
 	MetricLabelActionAdminNotified    MetricLabelAction = "admin_notified"
 

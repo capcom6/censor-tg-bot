@@ -9,6 +9,8 @@ import (
 )
 
 func TestNewConfig(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		config  map[string]any
@@ -115,6 +117,8 @@ func TestNewConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got, err := llm.NewConfig(tt.config)
 			if tt.wantErr {
 				require.Error(t, err)
@@ -127,6 +131,8 @@ func TestNewConfig(t *testing.T) {
 }
 
 func TestConfig_Validate(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		config  llm.Config
@@ -221,6 +227,8 @@ func TestConfig_Validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := tt.config.Validate()
 			if tt.wantErr {
 				require.Error(t, err)
@@ -232,6 +240,8 @@ func TestConfig_Validate(t *testing.T) {
 }
 
 func TestDefaultConfig(t *testing.T) {
+	t.Parallel()
+
 	config := llm.DefaultConfig()
 
 	// Check that defaults are set correctly
@@ -243,6 +253,8 @@ func TestDefaultConfig(t *testing.T) {
 }
 
 func TestConstants(t *testing.T) {
+	t.Parallel()
+
 	// Test that constants are properly defined
 	require.InDelta(t, float64(0.8), llm.DefaultConfidenceThreshold, 0.0001)
 	require.Equal(t, 30*time.Second, llm.DefaultTimeout)
