@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"fmt"
 	"html"
 	"strconv"
 	"strings"
@@ -31,4 +32,19 @@ func messageToString(message *tgbotapi.Message) string {
 	}
 
 	return ""
+}
+
+func removedNotification(plugin, reason string, message *tgbotapi.Message, copied bool) string {
+	notification := fmt.Sprintf(
+		"Removed message from %s\nPlugin: %s\nReason: %s",
+		userToString(message.From),
+		plugin,
+		reason,
+	)
+
+	if !copied {
+		notification += "\n<pre>" + messageToString(message) + "</pre>"
+	}
+
+	return notification
 }
