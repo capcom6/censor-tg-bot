@@ -82,6 +82,17 @@ func (b *Bot) processMessage(ctx context.Context, bot *tgbotapifx.Bot, message *
 		zap.Any("message", message),
 	)
 
+	copied := false
+	if message.Chat != nil {
+		if copyErr := b.copyToAdmin(bot, message); copyErr != nil {
+			b.logger.Warn("error copying message to admin", zap.Error(copyErr))
+			b.metrics.IncProcessedAction(MetricLabelActionMessageCopied, MetricLabelStatusFailed)
+		} else {
+			copied = true
+			b.metrics.IncProcessedAction(MetricLabelActionMessageCopied, MetricLabelStatusSuccess)
+		}
+	}
+
 	deleteReq := tgbotapi.NewDeleteMessage(message.Chat.ID, message.MessageID)
 	if _, delErr := bot.Request(deleteReq); delErr != nil {
 		b.metrics.IncProcessedAction(MetricLabelActionMessageDeleted, MetricLabelStatusFailed)
@@ -90,13 +101,7 @@ func (b *Bot) processMessage(ctx context.Context, bot *tgbotapifx.Bot, message *
 	b.metrics.IncProcessedAction(MetricLabelActionMessageDeleted, MetricLabelStatusSuccess)
 
 	// Enhanced admin notification with plugin details
-	notification := fmt.Sprintf(
-		"Removed message from %s\nPlugin: %s\nReason: %s\n<pre>%s</pre>",
-		userToString(message.From),
-		result.Plugin,
-		result.Reason,
-		messageToString(message),
-	)
+	notification := removedNotification(result.Plugin, result.Reason, message, copied)
 	if ntfErr := b.notifyAdmins(bot, notification); ntfErr != nil {
 		b.metrics.IncProcessedAction(MetricLabelActionAdminNotified, MetricLabelStatusFailed)
 		return fmt.Errorf("error notifying admins: %w", ntfErr)
@@ -250,6 +255,16 @@ func (b *Bot) downloadMedia(
 		SizeBytes:   len(data),
 		SHA256:      hex.EncodeToString(sum[:]),
 	}, nil
+}
+
+func (b *Bot) copyToAdmin(bot *tgbotapifx.Bot, message *tgbotapi.Message) error {
+	copyReq := tgbotapi.NewCopyMessage(b.config.AdminID, message.Chat.ID, message.MessageID)
+
+	if _, err := bot.CopyMessage(copyReq); err != nil {
+		return fmt.Errorf("error copying message: %w", err)
+	}
+
+	return nil
 }
 
 func (b *Bot) notifyAdmins(bot *tgbotapifx.Bot, message string) error {
