@@ -163,8 +163,7 @@ func (b *Bot) DownloadFile(ctx context.Context, fileID string, dst io.Writer, ma
 // unwrapped before it can reach a log. The timeout and status information of
 // the underlying error is preserved.
 func redactURLError(err error) error {
-	var urlErr *url.Error
-	if errors.As(err, &urlErr) {
+	if urlErr, ok := errors.AsType[*url.Error](err); ok {
 		return urlErr.Err
 	}
 

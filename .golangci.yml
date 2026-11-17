@@ -1,7 +1,7 @@
 # This file is licensed under the terms of the MIT license https://opensource.org/license/mit
 # Copyright (c) 2021-2025 Marat Reimers
 
-## Golden config for golangci-lint v2.15.0
+## Golden config for golangci-lint v2.14.0
 #
 # This is the best config for golangci-lint based on my experience and opinion.
 # It is very strict, but not extremely strict.
@@ -9,11 +9,6 @@
 # If this config helps you, please consider keeping a link to this repo (see the next comment).
 
 # Based on https://github.com/maratori/golangci-lint-config
-#
-# The settings below require golangci-lint v2.15.0, which the CI resolves as
-# "latest":
-#   - exhaustruct was renamed to exhaustruct_v5 in v2.13.0
-#   - the exhaustive.check value "map" was renamed to "mapliteral" in v2.15.0
 
 version: "2"
 
@@ -48,6 +43,7 @@ linters:
     - bidichk # checks for dangerous unicode character sequences
     - bodyclose # checks whether HTTP response body is closed successfully
     - canonicalheader # checks whether net/http.Header uses canonical header
+    - clickhouselint # detects common mistakes with the ClickHouse native Go driver API
     - copyloopvar # detects places where loop variables are copied (Go 1.22+)
     - cyclop # checks function and package cyclomatic complexity
     - depguard # checks if package imports are in a list of acceptable packages
@@ -146,6 +142,7 @@ linters:
     #- dogsled # checks assignments with too many blank identifiers (e.g. x, _, _, _, := f())
     #- dupword # [useless without config] checks for duplicate words in the source code
     #- errchkjson # [don't see profit + I'm against of omitting errors like in the first example https://github.com/breml/errchkjson] checks types passed to the json encoding functions. Reports unsupported types and optionally reports occasions, where the check for the returned error can be omitted
+    #- exhaustruct # [use exhaustruct_v5 instead] checks if all structure fields are initialized
     #- forcetypeassert # [replaced by errcheck] finds forced type assertions
     #- gomodguard_v2: [use more powerful depguard] allow and blocklist linter for direct Go module dependencies
     #- gosmopolitan # reports certain i18n/l10n anti-patterns in your Go codebase
@@ -246,6 +243,8 @@ linters:
       # Default: []
       ignore-patterns:
         # std libs
+        - ^crypto/tls.Config$
+        - ^crypto/x509.Certificate$
         - ^net.ListenConfig$
         - ^net/http.Client$
         - ^net/http.Cookie$
@@ -265,13 +264,15 @@ linters:
         - ^github.com/go-telegram-bot-api/telegram-bot-api/.+Config$
         - ^github.com/go-telegram/bot.+Params$
         - ^github.com/go-telegram/bot/models.+$
+        - ^github.com/go-webauthn/webauthn/webauthn.+(Config|Credential)$
         - ^github.com/gofiber/.+Config$
         - ^github.com/golang-jwt/jwt/v5.+Claims$
         - ^github.com/invopop/jsonschema.Reflector$
+        - ^github.com/minio/minio-go/.+Options$
         - ^github.com/mitchellh/mapstructure.DecoderConfig$
         - ^github.com/mymmrac/telego.+$
-        - ^github.com/openai/openai-go/v3\.ResponseFormatJSONSchemaJSONSchemaParam$
-        - ^github.com/openai/openai-go/v3\.ResponseFormatJSONSchemaParam$
+        - ^github.com/openai/openai-go/v3/shared\.ResponseFormatJSONSchemaJSONSchemaParam$
+        - ^github.com/openai/openai-go/v3/shared\.ResponseFormatJSONSchemaParam$
         - ^github.com/openai/openai-go/v3\.ChatCompletionNewParams$
         - ^github.com/openai/openai-go/v3\.ChatCompletionNewParamsResponseFormatUnion$
         - ^github.com/prometheus/client_golang/.+Opts$
@@ -285,10 +286,10 @@ linters:
         - ^github.com/testcontainers/testcontainers-go.+Request$
         - ^github.com/testcontainers/testcontainers-go.FromDockerfile$
         - ^github.com/ThreeDotsLabs/watermill.+(Config|Schema|Adapter)$
+        - ^github.com/urfave/cli.v3.+Flag$
         - ^github.com/urfave/cli.v3.ArgumentBase$
         - ^github.com/urfave/cli.v3.Command$
         - ^github.com/urfave/cli.v3.FlagBase$
-        - ^github.com/urfave/cli.v3.+Flag$
         - ^github.com/valyala/fasthttp.Client$
         - ^golang.org/x/tools/go/analysis.Analyzer$
         - ^google.golang.org/protobuf/.+Options$
@@ -300,6 +301,9 @@ linters:
       # Allows empty structures in return statements.
       # Default: false
       allow-empty-returns: true
+      # Allow empty literals the blank identifier receives.
+      # Default: false
+      allow-empty-blank-assignments: true
 
     funcorder:
       # Checks if the exported methods of a structure are placed before the non-exported ones.

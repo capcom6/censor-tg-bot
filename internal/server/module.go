@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/go-core-fx/fiberfx"
 	"github.com/go-core-fx/logger"
+	"github.com/gofiber/fiber/v3"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -14,7 +15,9 @@ func Module() fx.Option {
 
 		fx.Provide(func(log *zap.Logger) fiberfx.Options {
 			opts := fiberfx.Options{}
-			opts.WithErrorHandler(fiberfx.NewJSONErrorHandler(log))
+			opts.WithFiberConfig(func(cfg *fiber.Config) {
+				cfg.ErrorHandler = fiberfx.NewJSONErrorHandler(log)
+			})
 			opts.WithMetrics()
 			return opts
 		}),
