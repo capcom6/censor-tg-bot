@@ -48,12 +48,8 @@ func TestPluginIntegration_DICompatibility(t *testing.T) {
 	// Test plugin functionality
 	result, err := pluginInstance.Evaluate(context.Background(), plugin.Message{
 		Text:                "Test message",
-		ForwardedFromUserID: ptr(int64(12345)),
+		ForwardedFromUserID: new(int64(12345)),
 	})
 	require.NoError(t, err)
 	require.Equal(t, plugin.ActionAllow, result.Action)
-}
-
-func ptr[T any](value T) *T {
-	return &value
 }

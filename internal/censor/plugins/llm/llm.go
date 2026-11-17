@@ -14,6 +14,7 @@ import (
 	"github.com/invopop/jsonschema"
 	openai "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/packages/param"
 )
 
 const (
@@ -186,6 +187,8 @@ func (p *Plugin) callLLMAPI(ctx context.Context, prompt string, media *plugin.Me
 	ctx, cancel := context.WithTimeout(ctx, p.config.Timeout)
 	defer cancel()
 
+	var description param.Opt[string]
+
 	res, err := p.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Model: p.config.Model,
 		Messages: []openai.ChatCompletionMessageParamUnion{
@@ -193,18 +196,19 @@ func (p *Plugin) callLLMAPI(ctx context.Context, prompt string, media *plugin.Me
 		},
 		ResponseFormat: openai.ChatCompletionNewParamsResponseFormatUnion{
 			OfJSONSchema: &openai.ResponseFormatJSONSchemaParam{
+				Type: "json_schema",
 				JSONSchema: openai.ResponseFormatJSONSchemaJSONSchemaParam{
-					Name:   "response",
-					Schema: p.responseSchema,
-					Strict: openai.Bool(true),
+					Name:        "response",
+					Description: description,
+					Schema:      p.responseSchema,
+					Strict:      openai.Bool(true),
 				},
 			},
 		},
 		Temperature: openai.Float(p.config.Temperature),
 	})
 	if err != nil {
-		var apiErr *openai.Error
-		if errors.As(err, &apiErr) {
+		if apiErr, ok := errors.AsType[*openai.Error](err); ok {
 			return nil, fmt.Errorf("failed to call LLM API (HTTP %d): %w", apiErr.StatusCode, err)
 		}
 		return nil, fmt.Errorf("failed to call LLM API: %w", err)
