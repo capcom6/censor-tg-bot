@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/decisions"
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/duplicate"
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/forwarded"
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/keyword"
@@ -23,6 +24,7 @@ func Module() fx.Option {
 			fx.Annotate(forwarded.Metadata, fx.ResultTags(`group:"metadata"`)),
 			fx.Annotate(duplicate.Metadata, fx.ResultTags(`group:"metadata"`)),
 			fx.Annotate(llm.Metadata, fx.ResultTags(`group:"metadata"`)),
+			fx.Annotate(decisions.Metadata, fx.ResultTags(`group:"metadata"`)),
 			fx.Annotate(users.Metadata, fx.ResultTags(`group:"metadata"`)),
 		),
 	)

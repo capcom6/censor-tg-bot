@@ -3,8 +3,10 @@ module github.com/capcom6/censor-tg-bot
 go 1.26.0
 
 require (
+	github.com/go-core-fx/cachefx v0.2.1-0.20261113230249-9f0b5d998f52
 	github.com/go-core-fx/config v0.1.0
 	github.com/go-core-fx/fiberfx v1.0.0
+	github.com/go-core-fx/fxutil v0.0.2
 	github.com/go-core-fx/logger v0.0.1
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/invopop/jsonschema v0.14.0
@@ -26,9 +28,8 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/coder/websocket v1.8.15 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
-	github.com/go-core-fx/fxutil v0.0.2 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/gofiber/contrib/fiberzap/v2 v2.1.6 // indirect
 	github.com/gofiber/contrib/v3/prometheus v0.1.4 // indirect
@@ -57,11 +58,10 @@ require (
 	github.com/pb33f/go-yaml v0.1.1 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.2 // indirect
 	github.com/philhofer/fwd v1.2.1 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.6.3 // indirect
 	github.com/prometheus/common v0.74.0 // indirect
 	github.com/prometheus/procfs v0.23.0 // indirect
-	github.com/rogpeppe/go-internal v1.14.1 // indirect
+	github.com/redis/go-redis/v9 v9.17.2 // indirect
 	github.com/tidwall/gjson v1.20.4 // indirect
 	github.com/tidwall/match v1.2.0 // indirect
 	github.com/tidwall/pretty v1.3.0 // indirect

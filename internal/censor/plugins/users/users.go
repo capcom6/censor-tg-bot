@@ -40,7 +40,7 @@ func New(config Config) plugin.Plugin {
 func Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name: "users",
-		Factory: func(params map[string]any) (plugin.Plugin, error) {
+		Factory: func(params map[string]any, _ plugin.Deps) (plugin.Plugin, error) {
 			config, err := NewConfig(params)
 			if err != nil {
 				return nil, err

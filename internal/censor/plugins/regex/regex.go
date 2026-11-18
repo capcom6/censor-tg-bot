@@ -10,7 +10,7 @@ import (
 func Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name: "regex",
-		Factory: func(params map[string]any) (plugin.Plugin, error) {
+		Factory: func(params map[string]any, _ plugin.Deps) (plugin.Plugin, error) {
 			config, err := NewConfig(params)
 			if err != nil {
 				return nil, err
@@ -40,7 +40,7 @@ func (p *Plugin) Name() string {
 }
 
 func (p *Plugin) Priority() int {
-	const priority = 20
+	const priority = 25
 	return priority
 }
 

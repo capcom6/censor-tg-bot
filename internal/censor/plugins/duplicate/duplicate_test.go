@@ -8,8 +8,18 @@ import (
 
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugin"
 	"github.com/capcom6/censor-tg-bot/internal/censor/plugins/duplicate"
+	"github.com/go-core-fx/cachefx/cache"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
+
+// newDeps builds plugin deps backed by a real in-memory cache.
+func newDeps() plugin.Deps {
+	return plugin.Deps{
+		Cache:  cache.NewMemory(time.Hour),
+		Logger: zap.NewNop(),
+	}
+}
 
 func TestPlugin_New(t *testing.T) {
 	t.Parallel()
@@ -19,7 +29,7 @@ func TestPlugin_New(t *testing.T) {
 		Window:        5 * time.Minute,
 	}
 
-	p := duplicate.New(config)
+	p := duplicate.New(config, newDeps())
 
 	require.NotNil(t, p)
 	require.Implements(t, (*plugin.Plugin)(nil), p)
@@ -30,7 +40,7 @@ func TestPlugin_Name(t *testing.T) {
 
 	config := duplicate.DefaultConfig()
 
-	p := duplicate.New(config)
+	p := duplicate.New(config, newDeps())
 
 	require.Equal(t, "duplicate", p.Name())
 }
@@ -40,7 +50,7 @@ func TestPlugin_Priority(t *testing.T) {
 
 	config := duplicate.DefaultConfig()
 
-	p := duplicate.New(config)
+	p := duplicate.New(config, newDeps())
 
 	require.Equal(t, 150, p.Priority())
 }
@@ -184,7 +194,7 @@ func TestPlugin_Evaluate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			p := duplicate.New(tt.config)
+			p := duplicate.New(tt.config, newDeps())
 
 			// Call setup function if provided
 			if tt.setup != nil {
@@ -220,7 +230,7 @@ func TestPlugin_MediaDuplicates(t *testing.T) {
 	t.Run("first media occurrence skips", func(t *testing.T) {
 		t.Parallel()
 
-		p := duplicate.New(duplicate.Config{MaxDuplicates: 0, Window: 5 * time.Minute})
+		p := duplicate.New(duplicate.Config{MaxDuplicates: 0, Window: 5 * time.Minute}, newDeps())
 
 		result, err := p.Evaluate(context.Background(), message)
 		require.NoError(t, err)
@@ -231,7 +241,7 @@ func TestPlugin_MediaDuplicates(t *testing.T) {
 	t.Run("repeated media blocks", func(t *testing.T) {
 		t.Parallel()
 
-		p := duplicate.New(duplicate.Config{MaxDuplicates: 0, Window: 5 * time.Minute})
+		p := duplicate.New(duplicate.Config{MaxDuplicates: 0, Window: 5 * time.Minute}, newDeps())
 
 		_, err := p.Evaluate(context.Background(), message)
 		require.NoError(t, err)
@@ -246,7 +256,7 @@ func TestPlugin_MediaDuplicates(t *testing.T) {
 	t.Run("different media does not interfere", func(t *testing.T) {
 		t.Parallel()
 
-		p := duplicate.New(duplicate.Config{MaxDuplicates: 0, Window: 5 * time.Minute})
+		p := duplicate.New(duplicate.Config{MaxDuplicates: 0, Window: 5 * time.Minute}, newDeps())
 
 		other := message
 		other.Media = &plugin.Media{
@@ -267,57 +277,69 @@ func TestPlugin_MediaDuplicates(t *testing.T) {
 
 func TestStorage_RecordDuplicate(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
 
-	storage := duplicate.NewStorage(5 * time.Minute)
+	storage := duplicate.NewStorage(cache.NewMemory(time.Hour), 5*time.Minute)
 
 	// First occurrence - should return 1 (not exceeded)
-	stat := storage.Record(12345, "hash1")
-	require.Equal(t, 1, stat.Count)
+	count, err := storage.Record(ctx, 12345, "hash1")
+	require.NoError(t, err)
+	require.EqualValues(t, 1, count)
 
 	// Second occurrence - should return 2 (not exceeded)
-	stat = storage.Record(12345, "hash1")
-	require.Equal(t, 2, stat.Count)
+	count, err = storage.Record(ctx, 12345, "hash1")
+	require.NoError(t, err)
+	require.EqualValues(t, 2, count)
 
 	// Third occurrence - should return 3 (exceeded)
-	stat = storage.Record(12345, "hash1")
-	require.Equal(t, 3, stat.Count)
+	count, err = storage.Record(ctx, 12345, "hash1")
+	require.NoError(t, err)
+	require.EqualValues(t, 3, count)
 
 	// Different chat ID - should return 1 (separate tracking)
-	stat = storage.Record(99999, "hash1")
-	require.Equal(t, 1, stat.Count)
+	count, err = storage.Record(ctx, 99999, "hash1")
+	require.NoError(t, err)
+	require.EqualValues(t, 1, count)
 
 	// Different hash - should return 1
-	stat = storage.Record(12345, "hash2")
-	require.Equal(t, 1, stat.Count)
+	count, err = storage.Record(ctx, 12345, "hash2")
+	require.NoError(t, err)
+	require.EqualValues(t, 1, count)
 }
 
 func TestStorage_WindowExpiration(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
 
-	storage := duplicate.NewStorage(1 * time.Second)
+	storage := duplicate.NewStorage(cache.NewMemory(time.Hour), 1*time.Second)
 
 	// Record a duplicate
-	stat := storage.Record(12345, "hash1")
-	require.Equal(t, 1, stat.Count)
+	count, err := storage.Record(ctx, 12345, "hash1")
+	require.NoError(t, err)
+	require.EqualValues(t, 1, count)
 
 	// Second occurrence within window
-	stat = storage.Record(12345, "hash1")
-	require.Equal(t, 2, stat.Count)
+	count, err = storage.Record(ctx, 12345, "hash1")
+	require.NoError(t, err)
+	require.EqualValues(t, 2, count)
 
 	// Wait for window to expire
 	time.Sleep(2 * time.Second)
 
 	// Should reset count after window expiration
-	stat = storage.Record(12345, "hash1")
-	require.Equal(t, 1, stat.Count)
+	count, err = storage.Record(ctx, 12345, "hash1")
+	require.NoError(t, err)
+	require.EqualValues(t, 1, count)
 
 	// Should still allow another within the new window
-	stat = storage.Record(12345, "hash1")
-	require.Equal(t, 2, stat.Count)
+	count, err = storage.Record(ctx, 12345, "hash1")
+	require.NoError(t, err)
+	require.EqualValues(t, 2, count)
 
 	// Third occurrence should now exceed
-	stat = storage.Record(12345, "hash1")
-	require.Equal(t, 3, stat.Count)
+	count, err = storage.Record(ctx, 12345, "hash1")
+	require.NoError(t, err)
+	require.EqualValues(t, 3, count)
 }
 
 func TestPlugin_UnicodeHandling(t *testing.T) {
@@ -328,7 +350,7 @@ func TestPlugin_UnicodeHandling(t *testing.T) {
 		Window:        5 * time.Minute,
 	}
 
-	p := duplicate.New(config)
+	p := duplicate.New(config, newDeps())
 
 	unicodeMessage := plugin.Message{
 		Text:   "Привет мир! Hello 世界! 🎉",
@@ -397,7 +419,7 @@ func TestPlugin_TextExtraction(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			p := duplicate.New(config)
+			p := duplicate.New(config, newDeps())
 
 			result, err := p.Evaluate(context.Background(), tt.message)
 			require.NoError(t, err)
@@ -414,7 +436,7 @@ func TestPlugin_HashGeneration(t *testing.T) {
 		Window:        5 * time.Minute,
 	}
 
-	p := duplicate.New(config)
+	p := duplicate.New(config, newDeps())
 
 	// Test SHA-256 hash generation
 	message := "Test message for hashing"
@@ -429,7 +451,7 @@ func TestPlugin_HashGeneration(t *testing.T) {
 	// Verify the metadata contains the hash
 	require.NotEmpty(t, result1.Metadata["message_hash"])
 
-	p2 := duplicate.New(config)
+	p2 := duplicate.New(config, newDeps())
 
 	result2, err := p2.Evaluate(context.Background(), plugin.Message{
 		Text:   message,
@@ -453,7 +475,7 @@ func TestPlugin_Integration(t *testing.T) {
 		Window:        1 * time.Second,
 	}
 
-	p := duplicate.New(config)
+	p := duplicate.New(config, newDeps())
 
 	message := plugin.Message{
 		Text:   "Integration test message",
@@ -485,7 +507,7 @@ func TestPlugin_NilConfig(t *testing.T) {
 	t.Parallel()
 
 	// This should work with default configuration
-	p := duplicate.New(duplicate.Config{})
+	p := duplicate.New(duplicate.Config{}, newDeps())
 	require.NotNil(t, p)
 
 	// But the default config should be invalid
@@ -567,7 +589,7 @@ func TestPlugin_EmptyMessageHandling(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			p := duplicate.New(config)
+			p := duplicate.New(config, newDeps())
 
 			result, err := p.Evaluate(context.Background(), tt.message)
 			require.NoError(t, err)
@@ -585,7 +607,7 @@ func BenchmarkPlugin_Evaluate(b *testing.B) {
 		Window:        5 * time.Minute,
 	}
 
-	p := duplicate.New(config)
+	p := duplicate.New(config, newDeps())
 
 	message := plugin.Message{
 		Text:   "This is a benchmark test message with enough length",
@@ -602,10 +624,13 @@ func BenchmarkPlugin_Evaluate(b *testing.B) {
 }
 
 func BenchmarkStorage_RecordDuplicate(b *testing.B) {
-	storage := duplicate.NewStorage(5 * time.Minute)
+	storage := duplicate.NewStorage(cache.NewMemory(time.Hour), 5*time.Minute)
+	ctx := context.Background()
 
 	b.ResetTimer()
 	for i := range b.N {
-		storage.Record(12345, fmt.Sprintf("hash-%d", i))
+		if _, err := storage.Record(ctx, 12345, fmt.Sprintf("hash-%d", i)); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
