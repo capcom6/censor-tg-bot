@@ -22,16 +22,20 @@ type Metrics struct {
 	totalEvaluations  *prometheus.CounterVec   // Labels: result (allowed|blocked)
 }
 
-func NewMetrics() *Metrics {
+// NewMetrics creates the collectors on the given registerer, so tests can
+// isolate registration from the process-global default registry.
+func NewMetrics(registerer prometheus.Registerer) *Metrics {
+	auto := promauto.With(registerer)
+
 	return &Metrics{
-		pluginEvaluations: promauto.NewCounterVec(prometheus.CounterOpts{
+		pluginEvaluations: auto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: metricsNamespace,
 			Subsystem: metricsSubsystem,
 			Name:      "evaluations_total",
 			Help:      "Total number of plugin evaluations, labeled by plugin name and action",
 		}, []string{metricsLabelPlugin, "action"}),
 
-		pluginDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
+		pluginDuration: auto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: metricsNamespace,
 			Subsystem: metricsSubsystem,
 			Name:      "duration_seconds",
@@ -39,14 +43,14 @@ func NewMetrics() *Metrics {
 			Buckets:   []float64{1e-6, 1e-5, 1e-4, 0.001, 0.01, 0.1, 1, 10},
 		}, []string{metricsLabelPlugin}),
 
-		pluginErrors: promauto.NewCounterVec(prometheus.CounterOpts{
+		pluginErrors: auto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: metricsNamespace,
 			Subsystem: metricsSubsystem,
 			Name:      "errors_total",
 			Help:      "Total number of plugin evaluation errors",
 		}, []string{metricsLabelPlugin}),
 
-		totalEvaluations: promauto.NewCounterVec(prometheus.CounterOpts{
+		totalEvaluations: auto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: metricsNamespace,
 			Subsystem: "",
 			Name:      "evaluations_total",

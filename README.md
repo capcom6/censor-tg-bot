@@ -34,6 +34,7 @@
       - [Duplicate Plugin](#duplicate-plugin)
       - [Users Plugin](#users-plugin)
       - [LLM Plugin](#llm-plugin)
+      - [Decisions Plugin](#decisions-plugin)
   - [Execution Strategies](#execution-strategies)
     - [Sequential (Default)](#sequential-default)
     - [Parallel](#parallel)
@@ -58,7 +59,7 @@ A plugin system lets you choose which checks to run, in what order, and whether 
 ## Features
 
 - **Plugin-based architecture** — extend with custom filtering logic
-- **7 built-in plugins**:
+- **8 built-in plugins**:
   - **Keyword** — block messages containing blacklisted words (case-insensitive, Unicode-normalized)
   - **Regex** — block messages matching regular expression patterns
   - **Rate Limit** — limit messages per user within a time window
@@ -66,6 +67,7 @@ A plugin system lets you choose which checks to run, in what order, and whether 
   - **Duplicate** — detect and block repeated messages from a user
   - **Users** — blacklist/whitelist specific user IDs
   - **LLM** — analyze message content via an external LLM API
+  - **Decisions** — structured decisions with calibrated probabilities via a decisions API
 - **Photo moderation** — photos are downloaded once per message; the duplicate plugin compares SHA-256 digests and the LLM plugin sends the image to the model. The configured model must support image input: with a text-only model the photo request fails and the message falls back to `CENSOR__ERROR_ACTION` (default `block`)
 - **Sequential or parallel** execution strategies
 - **Automatic user banning** after configurable violation threshold
@@ -163,12 +165,14 @@ The application loads configuration from environment variables (via `.env` file)
 | `CENSOR__SKIP_ACTION`   | No       | `allow`                   | Default action when all plugins skip (`block` or `allow`)                                                   |
 | `CENSOR__STRATEGY`      | No       | `sequential`              | Execution strategy (`sequential` or `parallel`)                                                             |
 | `CENSOR__TIMEOUT`       | No       | `30s`                     | Time budget for evaluating one message across all plugins                                                   |
+| `CACHE__SWEEP_INTERVAL` | No       | `1m`                      | How often the cachefx sweeper evicts expired cache entries                                                  |
+| `CACHE__URL`            | No       | `memory://?max_entries=1000` | App-wide cache backend shared by plugins (`memory://[?max_entries=N]` or `redis://...`; LRU cap applies per cache) |
 | `CONFIG_PATH`           | No       | —                         | Path to YAML configuration file                                                                             |
 | `DEBUG`                 | No       | `false`                   | Enable debug logging and Telegram API request logging (`true`)                                              |
 | `HTTP__ADDRESS`         | No       | `127.0.0.1:3000`          | Metrics endpoint address                                                                                    |
 | `HTTP__PROXIES`         | No       | —                         | Trusted proxy IPs — a single IP or a JSON array (e.g. `["127.0.0.1"]`); comma-separated lists are not split |
 | `HTTP__PROXY_HEADER`    | No       | `X-Forwarded-For`         | Proxy header for trusted proxies                                                                            |
-| `STORAGE__URL`          | No       | `memory://storage?ttl=5m` | Storage backend URL (`memory://` only, with TTL)                                                            |
+| `STORAGE__TTL`          | No       | `5m`                      | Sliding idle-window for user violation counters (ban threshold)                                              |
 | `TELEGRAM__PROXY_URL`   | No       | —                         | SOCKS5 proxy URL                                                                                            |
 | `TELEGRAM__TIMEOUT`     | No       | `60s`                     | Timeout for Telegram API requests (raised to a `70s` minimum)                                               |
 
@@ -208,7 +212,7 @@ censor:
   plugins:
     keyword:
       enabled: true
-      priority: 10
+      priority: 20
       config:
         blacklist:
           - spam
@@ -217,14 +221,14 @@ censor:
 
     ratelimit:
       enabled: true
-      priority: 5
+      priority: 15
       config:
         max_messages: 5
         window: "1m"
 
     regex:
       enabled: false
-      priority: 20
+      priority: 25
       config:
         patterns:
           - 'https?://[\w\-\.]+\.xyz'
@@ -232,7 +236,7 @@ censor:
 
     forwarded:
       enabled: false
-      priority: 15
+      priority: 10
       config:
         allowed_user_ids:
           - 123456789
@@ -255,7 +259,7 @@ censor:
 
     llm:
       enabled: false
-      priority: 250
+      priority: 260
       config:
         api_key: "<your-api-key>"
         model: "nvidia/nemotron-3.5-super-vl:free"
@@ -263,6 +267,15 @@ censor:
         timeout: 30s
         prompt: "Analyze the following message..."
         temperature: 0.1
+
+    decisions:
+      enabled: false
+      priority: 250
+      config:
+        api_key: "<your-api-key>"
+        model: "~typesafe/jev-latest"
+        block_threshold: 0.7
+        timeout: 30s
 ```
 
 **Note:** Provide your API key through an environment variable (e.g., `CENSOR__PLUGINS__LLM__CONFIG__API_KEY`) or an uncommitted local config file to avoid committing secrets.
@@ -347,7 +360,7 @@ Blocks or allows messages based on user IDs. Whitelisted users are always allowe
 
 #### LLM Plugin
 
-Blocks messages containing potentially inappropriate content, spam, or violations by analyzing the message with an external LLM API. Supports response caching (LRU eviction) to reduce API costs.
+Blocks messages containing potentially inappropriate content, spam, or violations by analyzing the message with an external LLM API. Supports response caching (TTL-bound, app-wide cache backend) to reduce API costs.
 
 Photos are sent to the model as an image next to the caption, so a picture is evaluated even when it carries no text. The cache key contains the digest of the photo, so the same caption with a different image is a new request.
 
@@ -362,9 +375,65 @@ Photos are sent to the model as an image next to the caption, so a picture is ev
 | `temperature`          | `float`  | `0.1`                                 | `0.0` – `2.0` | LLM sampling temperature                    |
 | `cache_enabled`        | `bool`   | `true`                                | —             | Enable response caching                     |
 | `cache_ttl`            | `string` | `"1h"`                                | `1m` – `24h`  | Cache entry TTL                             |
-| `cache_max_size`       | `int`    | `1000`                                | `> 0`         | Max cached entries (LRU eviction)           |
 
 **Use Cases:** Filtering semantic spam that evades keyword matching, multi-language moderation, context-sensitive content filtering.
+
+---
+
+#### Decisions Plugin
+
+Blocks messages by asking a [decisions API](https://routerai.ru/docs/reference#tag/decisions/POST/v1/decisions) a fixed set of atomic questions about the message. Unlike an LLM, a decisions model returns typed answers with calibrated probabilities instead of generated text: one request, parallel questions, no parsing of prose. The plugin is vendor-neutral: `base_url` points at any endpoint implementing `POST /v1/decisions`.
+
+The plugin sends one request with three questions and composes the answers in code:
+
+| Question   | Type     | Asks                                                          |
+| ---------- | -------- | ------------------------------------------------------------- |
+| `category` | `choice` | Main purpose of the message: `spam`, `scam`, `abuse`, `other` |
+| `spam`     | `noul`   | Is this unsolicited advertising or self-promotion?            |
+| `abuse`    | `noul`   | Is this insulting, threatening, or harassing someone?         |
+
+A message is **blocked** when a violation category (`spam`/`scam`/`abuse`) wins with probability ≥ `block_threshold`, or when the `spam` or `abuse` yes/no probability reaches `block_threshold`. Otherwise the plugin **skips** — it never returns `allow`, so it cannot override another plugin's block. The admin notification carries the category and probabilities (e.g. `Reason: spam (p=0.97)`).
+
+Answers are cached (TTL-bound, app-wide cache backend); editing a question's text in config invalidates cached entries. Text-only: photo-only messages are skipped for now.
+
+| Config Key        | Type     | Default                     | Valid Range   | Description                                                             |
+| ----------------- | -------- | --------------------------- | ------------- | ----------------------------------------------------------------------- |
+| `base_url`        | `string` | `"https://routerai.ru/api"` | —             | Base URL of the decisions API                                           |
+| `api_key`         | `string` | `""`                        | —             | API key (required)                                                      |
+| `model`           | `string` | `"~typesafe/jev-latest"`    | —             | Decision model name or alias (see [models](https://routerai.ru/models)) |
+| `block_threshold` | `float`  | `0.7`                       | `0.0` – `1.0` | Probability at or above which a violation blocks                        |
+| `timeout`         | `string` | `"30s"`                     | `5s` – `5m`   | API call timeout                                                        |
+| `context`         | `string` | `""`                        | —             | Optional context added to the state (group topic, rules)                |
+| `cache_enabled`   | `bool`   | `true`                      | —             | Enable answer caching                                                   |
+| `cache_ttl`       | `string` | `"1h"`                      | `1m` – `24h`  | Cache entry TTL                                                         |
+| `questions`       | map      | *see below*                 | —             | Per-question `instructions` and `criteria` text overrides               |
+
+The question text is configurable; question IDs, types, and option keys stay fixed in code. Omitted fields keep the defaults printed below:
+
+```yaml
+config:
+  context: "A group about cats"
+  questions:
+    category:
+      instructions: "Which category best describes the main purpose of the message?"
+      criteria:
+        spam: "Unsolicited advertising, self-promotion, or promotional links; not ordinary conversation or a useful link"
+        scam: "Phishing, fake giveaways, fake support agents, or requests for credentials and money"
+        abuse: "Insults, threats, hate speech, or harassment aimed at a person"
+        other: "Ordinary conversation, questions, reactions, or anything that fits none of the other categories"
+    spam:
+      instructions: "Is this message unsolicited advertising or self-promotion?"
+      criteria:
+        "true": "Unsolicited advertising, self-promotion, or a promotional link"
+        "false": "Legitimate conversation or a useful, on-topic link"
+    abuse:
+      instructions: "Is this message insulting, threatening, or harassing someone?"
+      criteria:
+        "true": "Insults, threats, slurs, or personal attacks against a person"
+        "false": "Friendly, neutral, or light banter with no target"
+```
+
+**Use Cases:** Low-latency spam and abuse gating with explicit confidence signals, tuning the policy without a redeploy, replacing prompt-engineered LLM checks with typed decisions.
 
 ## Execution Strategies
 

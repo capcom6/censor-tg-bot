@@ -49,5 +49,16 @@ func NewConfig(config map[string]any) (Config, error) {
 		}
 	}
 
+	// A zero or negative window would be used as a cache TTL, where zero
+	// means "never expires": the counter would block every later message
+	// forever and the sweeper could not reclaim it.
+	if c.Window <= 0 {
+		return Config{}, fmt.Errorf(
+			"%w: window must be positive, got %s",
+			plugin.ErrInvalidConfig,
+			c.Window,
+		)
+	}
+
 	return c, nil
 }

@@ -1,130 +1,86 @@
 package llm
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"sync"
+	"errors"
+	"fmt"
+	"strconv"
 	"time"
+
+	"github.com/go-core-fx/cachefx/cache"
 )
 
-// Storage implements an in-memory cache for LLM responses
-// Uses content-based hashing with TTL expiration and LRU eviction.
+// Storage is a typed cache for LLM responses over the app cache.
+//
+// Entries carry the plugin TTL; expired entries are reclaimed by the cachefx
+// sweeper and evicted lazily on Get.
 type Storage struct {
-	ttl     time.Duration
-	maxSize int
-	entries map[string]*CachedResponse
-	mu      sync.Mutex
+	cache *cache.Typed[*Response]
+	ttl   time.Duration
 }
 
-// CachedResponse represents a cached LLM response with metadata
-// Includes access tracking for LRU eviction.
-type CachedResponse struct {
-	Response    *Response
-	CachedAt    time.Time
-	AccessCount int
-	LastAccess  time.Time
-}
-
-// NewStorage creates a new cache storage with specified TTL and maximum size.
-func NewStorage(ttl time.Duration, maxSize int) *Storage {
+// NewStorage creates a Storage over the injected app cache with the given TTL
+// applied to every entry.
+func NewStorage(c cache.Cache, ttl time.Duration) *Storage {
 	return &Storage{
-		ttl:     ttl,
-		maxSize: maxSize,
-		entries: make(map[string]*CachedResponse),
-		mu:      sync.Mutex{},
+		cache: cache.NewTyped[*Response](c),
+		ttl:   ttl,
 	}
 }
 
-// generateCacheKey creates a stable hash key from message text, model, prompt and
-// media identity. This ensures identical content with same configuration gets cache
-// hits, while the same caption with a different image does not.
-func (s *Storage) generateCacheKey(text string, model string, prompt string, mediaHash string) string {
-	// Include text, model, prompt and media hash to ensure cache validity
-	data := text + "\x00" + model + "\x00" + prompt + "\x00" + mediaHash
+// generateCacheKey creates a stable hash key from message text, model, prompt,
+// media identity, provider endpoint and temperature. This ensures identical
+// content with same configuration gets cache hits, while the same caption with
+// a different image, endpoint or temperature does not.
+func generateCacheKey(
+	text string,
+	model string,
+	prompt string,
+	mediaHash string,
+	endpoint string,
+	temperature float64,
+) string {
+	data := text + "\x00" + model + "\x00" + prompt + "\x00" + mediaHash + "\x00" + endpoint +
+		"\x00" + strconv.FormatFloat(temperature, 'g', -1, 64)
 	hash := sha256.Sum256([]byte(data))
+
 	return hex.EncodeToString(hash[:])
 }
 
-// Get retrieves cached response if valid and not expired
-// Returns the response and a boolean indicating if cache hit occurred.
-func (s *Storage) Get(key string) (*Response, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	entry, exists := s.entries[key]
-	if !exists {
-		return nil, false
-	}
-
-	// Check expiration
-	if time.Since(entry.CachedAt) > s.ttl {
-		delete(s.entries, key)
-		return nil, false
-	}
-
-	// Update access metadata
-	entry.AccessCount++
-	entry.LastAccess = time.Now()
-
-	return entry.Response, true
-}
-
-func (s *Storage) GetBy(text, model, prompt, mediaHash string) (*Response, bool) {
-	key := s.generateCacheKey(text, model, prompt, mediaHash)
-	return s.Get(key)
-}
-
-// Set stores a response in cache with LRU eviction if needed.
-func (s *Storage) Set(key string, resp *Response) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// Evict if at capacity and key doesn't already exist
-	if _, exists := s.entries[key]; !exists && len(s.entries) >= s.maxSize {
-		s.evictLRU()
-	}
-
-	s.entries[key] = &CachedResponse{
-		Response:    resp,
-		CachedAt:    time.Now(),
-		AccessCount: 1,
-		LastAccess:  time.Now(),
-	}
-}
-
-func (s *Storage) SetBy(text, model, prompt, mediaHash string, resp *Response) {
-	key := s.generateCacheKey(text, model, prompt, mediaHash)
-	s.Set(key, resp)
-}
-
-// evictLRU removes the least recently used entry
-// Used when cache reaches maximum size.
-func (s *Storage) evictLRU() {
-	var oldestKey string
-	var oldestTime time.Time
-
-	for key, entry := range s.entries {
-		if oldestKey == "" || entry.LastAccess.Before(oldestTime) {
-			oldestKey = key
-			oldestTime = entry.LastAccess
+// GetBy returns the cached response for the given cache key material.
+//
+// The bool reports a hit; a missing or expired key is (nil, false, nil), and
+// only a real cache failure returns an error.
+func (s *Storage) GetBy(
+	ctx context.Context,
+	text, model, prompt, mediaHash, endpoint string,
+	temperature float64,
+) (*Response, bool, error) {
+	resp, err := s.cache.Get(ctx, generateCacheKey(text, model, prompt, mediaHash, endpoint, temperature))
+	if err != nil {
+		if errors.Is(err, cache.ErrKeyNotFound) {
+			return nil, false, nil
 		}
+
+		return nil, false, fmt.Errorf("failed to get llm response: %w", err)
 	}
 
-	if oldestKey != "" {
-		delete(s.entries, oldestKey)
-	}
+	return resp, true, nil
 }
 
-// Cleanup removes all expired entries from cache
-// Called periodically to maintain cache health.
-func (s *Storage) Cleanup() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	now := time.Now()
-	for key, entry := range s.entries {
-		if now.Sub(entry.CachedAt) > s.ttl {
-			delete(s.entries, key)
-		}
+// SetBy stores a response under the given cache key material with the storage TTL.
+func (s *Storage) SetBy(
+	ctx context.Context,
+	text, model, prompt, mediaHash, endpoint string,
+	temperature float64,
+	resp *Response,
+) error {
+	key := generateCacheKey(text, model, prompt, mediaHash, endpoint, temperature)
+	if err := s.cache.Set(ctx, key, resp, cache.WithTTL(s.ttl)); err != nil {
+		return fmt.Errorf("failed to set llm response: %w", err)
 	}
+
+	return nil
 }

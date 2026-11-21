@@ -10,13 +10,13 @@ import (
 func Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name: "ratelimit",
-		Factory: func(params map[string]any) (plugin.Plugin, error) {
+		Factory: func(params map[string]any, deps plugin.Deps) (plugin.Plugin, error) {
 			config, err := NewConfig(params)
 			if err != nil {
 				return nil, err
 			}
 
-			return New(config), nil
+			return New(config, deps), nil
 		},
 	}
 }
@@ -27,11 +27,11 @@ type Plugin struct {
 	storage     *Storage
 }
 
-func New(config Config) plugin.Plugin {
+func New(config Config, deps plugin.Deps) plugin.Plugin {
 	return &Plugin{
 		maxMessages: config.MaxMessages,
 		window:      config.Window,
-		storage:     NewStorage(),
+		storage:     NewStorage(deps.Cache),
 	}
 }
 
@@ -44,17 +44,17 @@ func (p *Plugin) Capabilities() plugin.Capability {
 }
 
 func (p *Plugin) Priority() int {
-	const priority = 5
-	return priority // Very high priority (early execution)
+	const priority = 15
+	return priority // Early execution; cheap in-memory counter
 }
 
-func (p *Plugin) Evaluate(_ context.Context, msg plugin.Message) (plugin.Result, error) {
-	count, err := p.storage.IncrementAndGet(msg.UserID, p.window)
+func (p *Plugin) Evaluate(ctx context.Context, msg plugin.Message) (plugin.Result, error) {
+	count, err := p.storage.IncrementAndGet(ctx, msg.UserID, p.window)
 	if err != nil {
 		return plugin.Result{}, err
 	}
 
-	if count > p.maxMessages {
+	if count > int64(p.maxMessages) {
 		return plugin.Result{
 			Action: plugin.ActionBlock,
 			Reason: "Rate limit exceeded",
@@ -74,6 +74,7 @@ func (p *Plugin) Evaluate(_ context.Context, msg plugin.Message) (plugin.Result,
 	}, nil
 }
 
-func (p *Plugin) Cleanup(_ context.Context) {
-	p.storage.Cleanup()
+// Cleanup is a no-op: expired counters are recreated by the next message and
+// reclaimed by the cachefx sweeper.
+func (p *Plugin) Cleanup(context.Context) {
 }

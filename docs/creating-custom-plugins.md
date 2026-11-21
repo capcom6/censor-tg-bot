@@ -4,18 +4,25 @@ The plugin architecture allows you to create custom filtering logic by implement
 
 ### Plugin Interface
 
-All plugins must implement three methods:
+All plugins must implement five methods:
 
 ```go
 type Plugin interface {
     // Name returns the unique identifier for this plugin
     Name() string
 
+    // Capabilities declares what the plugin inspects (text, media)
+    Capabilities() Capability
+
     // Evaluate inspects a message and returns a decision
     Evaluate(ctx context.Context, msg Message) (Result, error)
 
     // Priority returns the execution priority (lower = earlier execution)
     Priority() int
+
+    // Cleanup performs periodic maintenance (no-op when the app cache
+    // sweeper handles eviction)
+    Cleanup(ctx context.Context)
 }
 ```
 
@@ -61,16 +68,43 @@ type Plugin struct {
     config Config
 }
 
-func New(config Config) plugin.Plugin {
-    return &Plugin{config: config}
+// Metadata registers the plugin with the wiring.
+func Metadata() plugin.Metadata {
+    return plugin.Metadata{
+        Name: "myplugin",
+        Factory: func(params map[string]any, deps plugin.Deps) (plugin.Plugin, error) {
+            config, err := NewConfig(params)
+            if err != nil {
+                return nil, err
+            }
+
+            return New(config, deps)
+        },
+    }
+}
+
+// New creates the plugin from its config block and shared deps.
+//
+// deps.Cache is the app-scoped cache named after the plugin (guaranteed
+// non-nil); deps.Logger is the module logger for non-fatal errors, such as
+// cache failures that must degrade instead of failing Evaluate.
+func New(config Config, deps plugin.Deps) (plugin.Plugin, error) {
+    return &Plugin{config: config}, nil
 }
 
 func (p *Plugin) Name() string {
     return "myplugin"
 }
 
+func (p *Plugin) Capabilities() plugin.Capability {
+    return plugin.CapabilityText
+}
+
 func (p *Plugin) Priority() int {
     return 15 // Lower number = earlier execution
+}
+
+func (p *Plugin) Cleanup(context.Context) {
 }
 
 func (p *Plugin) Evaluate(ctx context.Context, msg plugin.Message) (plugin.Result, error) {
@@ -102,39 +136,22 @@ func (p *Plugin) Evaluate(ctx context.Context, msg plugin.Message) (plugin.Resul
 }
 ```
 
-### Step 2: Create Configuration Provider
+### Step 2: Register the Plugin
 
-Update [`internal/censor/module.go`](internal/censor/module.go) to provide plugin config:
-
-```go
-fx.Provide(
-    func(config Config) (myplugin.Config, error) {
-        configMap := map[string]any{}
-        if v, ok := config.Plugins["myplugin"]; ok {
-            configMap = v.Config
-        }
-        
-        c, err := myplugin.NewConfig(configMap)
-        if err != nil {
-            return c, fmt.Errorf("failed to create myplugin config: %w", err)
-        }
-        
-        return c, nil
-    },
-),
-```
-
-### Step 3: Register the Plugin
-
-Update [`internal/censor/plugins/module.go`](internal/censor/plugins/module.go) to register your plugin:
+Update [`internal/censor/plugins/module.go`](../internal/censor/plugins/module.go) to register your plugin metadata:
 
 ```go
 fx.Provide(
-    fx.Annotate(myplugin.New, fx.ResultTags(`group:"plugins"`)),
+    fx.Annotate(myplugin.Metadata, fx.ResultTags(`group:"metadata"`)),
 ),
 ```
 
-### Step 4: Add Configuration to YAML
+The wiring builds every registered plugin from its YAML config block and the
+shared `plugin.Deps` (the app-scoped cache named after the plugin, plus the
+module logger), so no changes to `internal/censor/module.go` or the config
+module are needed.
+
+### Step 3: Add Configuration to YAML
 
 Add your plugin configuration to `config.yml`:
 
@@ -161,10 +178,11 @@ The `plugin.Message` struct provides access to:
 
 ### Best Practices
 
-1. **Use appropriate priority values:**
-   - 1-5: Very high priority (rate limiting, simple checks)
-   - 10-15: Medium priority (keyword matching)
-   - 20+: Low priority (expensive operations like regex, ML models)
+1. **Use appropriate priority values** (defaults run from the lightweight plugin to the most expensive one):
+   - 1-15: Trivial in-memory checks (user lists, forwards, rate limiting)
+   - 20-30: Content matching (keywords, regex)
+   - 100-200: Stateful checks backed by storage (duplicates)
+   - 200+: External API calls (decisions, LLM)
 
 2. **Return ActionSkip when uncertain** - Let other plugins make the decision
 

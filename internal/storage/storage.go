@@ -1,56 +1,48 @@
 package storage
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"net/url"
-	"sync"
 	"time"
+
+	"github.com/go-core-fx/cachefx/cache"
 )
 
+// Storage counts violations per key in the app cache with a sliding
+// idle-window: every increment restarts the window, so a counter resets only
+// after ttl of inactivity. Idle counters are reclaimed by the cachefx sweeper.
 type Storage struct {
-	ttl time.Duration
-
-	items map[string]*item
-	mux   *sync.Mutex
+	cache cache.Cache
+	ttl   time.Duration
 }
 
-func (s *Storage) GetOrSet(key string) (int, error) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-
-	i, ok := s.items[key]
-	if ok {
-		return i.inc(), nil
-	}
-
-	i, err := newItem(s.ttl)
-	if err != nil {
-		return 0, err
-	}
-
-	s.items[key] = i
-
-	return 1, nil
-}
-
-func New(config Config) (*Storage, error) {
-	u, err := url.Parse(config.URL)
-	if err != nil {
-		return nil, fmt.Errorf("%w: failed to parse url: %w", ErrInitFailed, err)
-	}
-
-	if u.Scheme != "memory" {
-		return nil, fmt.Errorf("%w: unsupported scheme: %s", ErrInitFailed, u.Scheme)
-	}
-
-	ttl, err := time.ParseDuration(u.Query().Get("ttl"))
-	if err != nil {
-		return nil, fmt.Errorf("%w: error parsing ttl: %w", ErrInitFailed, err)
+// New creates a Storage over the injected app cache.
+func New(c cache.Cache, config Config) (*Storage, error) {
+	if config.TTL <= 0 {
+		return nil, fmt.Errorf("%w: ttl must be greater than 0", ErrInvalidTTL)
 	}
 
 	return &Storage{
-		ttl:   ttl,
-		items: make(map[string]*item),
-		mux:   &sync.Mutex{},
+		cache: c,
+		ttl:   config.TTL,
 	}, nil
+}
+
+// Increment increments the counter for key and returns the new value while
+// sliding the window forward by the configured ttl.
+func (s *Storage) Increment(ctx context.Context, key string) (int64, error) {
+	count, err := s.cache.Increment(ctx, key, 1, cache.WithTTL(s.ttl))
+	if err != nil {
+		return 0, fmt.Errorf("failed to increment counter: %w", err)
+	}
+
+	// Slide the window: restart the idle timer on every violation. A miss
+	// between the two calls is benign - the count above already stands.
+	_, getErr := s.cache.Get(ctx, key, cache.AndSetTTL(s.ttl))
+	if getErr != nil && !errors.Is(getErr, cache.ErrKeyNotFound) {
+		return count, fmt.Errorf("failed to extend counter window: %w", getErr)
+	}
+
+	return count, nil
 }

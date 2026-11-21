@@ -4,13 +4,16 @@ import (
 	"context"
 
 	"github.com/capcom6/censor-tg-bot/internal/bot"
+	"github.com/capcom6/censor-tg-bot/internal/cache"
 	"github.com/capcom6/censor-tg-bot/internal/censor"
 	"github.com/capcom6/censor-tg-bot/internal/config"
 	"github.com/capcom6/censor-tg-bot/internal/server"
 	"github.com/capcom6/censor-tg-bot/internal/storage"
 	"github.com/capcom6/censor-tg-bot/pkg/tgbotapifx"
+	"github.com/go-core-fx/cachefx"
 	"github.com/go-core-fx/fiberfx"
 	"github.com/go-core-fx/logger"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -39,8 +42,14 @@ func main() {
 		logger.Module(),
 		tgbotapifx.Module(),
 		fiberfx.Module(),
+		cachefx.Module(cachefx.WithSweeper()),
 		//
+		fx.Provide(func() prometheus.Registerer {
+			return prometheus.DefaultRegisterer
+		}),
 		config.Module(),
+		cache.Module(),
+		//
 		censor.Module(),
 		storage.Module(),
 		bot.Module(),
