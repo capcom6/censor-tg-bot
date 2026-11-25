@@ -78,9 +78,43 @@ censor:
         # Supported formats: "30s", "5m", "1h", "24h"
         window: "5m"
 
+    # Decisions plugin - blocks messages via a decisions API
+    # One request asks three atomic questions (category choice + two yes/no checks)
+    # and the answers come back as calibrated probabilities.
+    # Vendor-neutral: any endpoint implementing POST /decisions works via base_url.
+    # Priority: 250
+    decisions:
+      enabled: false
+      priority: 250
+      config:
+        # API key, preferably via CENSOR__PLUGINS__DECISIONS__CONFIG__API_KEY
+        # api_key: "your-decisions-api-key"
+        # Base URL of the decisions API
+        # base_url: "https://openrouter.ai/api/alpha"
+        model: perplexity/pplx-decider-v1.3:free # see https://openrouter.ai/models
+        # Probability at or above which a violation blocks the message
+        block_threshold: 0.7
+        timeout: 30s
+        # Optional context added to the state (group topic, rules)
+        # context: "A group about cats"
+        # Enable caching for decision answers to reduce API calls
+        cache_enabled: true # default: true
+        cache_ttl: "1h" # default: "1h"
+        # Optional: override the question text (see README for the defaults)
+        # questions:
+        #   category:
+        #     instructions: "Which category best describes the main purpose of the message?"
+        #     criteria: { spam: "...", scam: "...", abuse: "...", other: "..." }
+        #   spam:
+        #     instructions: "Is this message unsolicited advertising or self-promotion?"
+        #     criteria: { "true": "...", "false": "..." }
+        #   abuse:
+        #     instructions: "Is this message insulting, threatening, or harassing someone?"
+        #     criteria: { "true": "...", "false": "..." }
+
     llm:
       enabled: true
-      priority: 250
+      priority: 260
       config:
         api_key: "sk-1234567890"
         model: nvidia/nemotron-3.5-super-vl:free
