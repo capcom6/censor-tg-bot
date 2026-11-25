@@ -27,13 +27,13 @@ type hasher interface {
 func Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name: "duplicate",
-		Factory: func(params map[string]any) (plugin.Plugin, error) {
+		Factory: func(params map[string]any, deps plugin.Deps) (plugin.Plugin, error) {
 			config, err := NewConfig(params)
 			if err != nil {
 				return nil, err
 			}
 
-			return New(config), nil
+			return New(config, deps), nil
 		},
 	}
 }
@@ -45,9 +45,9 @@ type Plugin struct {
 	hashers map[string]hasher
 }
 
-func New(config Config) plugin.Plugin {
+func New(config Config, deps plugin.Deps) plugin.Plugin {
 	return &Plugin{
-		storage: NewStorage(config.Window),
+		storage: NewStorage(deps.Cache, config.Window),
 		config:  config,
 
 		hashers: map[string]hasher{
@@ -76,7 +76,7 @@ func (p *Plugin) Evaluate(ctx context.Context, msg plugin.Message) (plugin.Resul
 
 	hashes := map[string]string{}
 	errs := map[string]error{}
-	var stats []Entry
+	var stats []int64
 	for prefix, hasher := range p.hashers {
 		hash, err := hasher.Hash(ctx, msg)
 		if err != nil {
@@ -90,13 +90,13 @@ func (p *Plugin) Evaluate(ctx context.Context, msg plugin.Message) (plugin.Resul
 
 		hashes[prefix] = hash
 
-		// Record duplicate and check if limit exceeded
-		stat := p.storage.Record(
-			msg.ChatID,
-			prefix+hash,
-		)
+		// Record the occurrence and check the limit below.
+		count, err := p.storage.Record(ctx, msg.ChatID, prefix+hash)
+		if err != nil {
+			return plugin.Result{}, err
+		}
 
-		stats = append(stats, stat)
+		stats = append(stats, count)
 	}
 
 	skipErrs := lo.FilterValues(
@@ -127,8 +127,8 @@ func (p *Plugin) Evaluate(ctx context.Context, msg plugin.Message) (plugin.Resul
 		}, nil
 	}
 
-	violations := lo.Filter(stats, func(stat Entry, _ int) bool {
-		return stat.Count > maxOccurrences
+	violations := lo.Filter(stats, func(count int64, _ int) bool {
+		return count > int64(maxOccurrences)
 	})
 
 	if len(violations) == 0 {
@@ -140,7 +140,7 @@ func (p *Plugin) Evaluate(ctx context.Context, msg plugin.Message) (plugin.Resul
 		}, nil
 	}
 
-	metadata["count"] = violations[0].Count
+	metadata["count"] = violations[0]
 	metadata["max_occurrences"] = maxOccurrences
 	metadata["window"] = p.config.Window
 
@@ -148,7 +148,7 @@ func (p *Plugin) Evaluate(ctx context.Context, msg plugin.Message) (plugin.Resul
 		Action: plugin.ActionBlock,
 		Reason: fmt.Sprintf(
 			"duplicate limit exceeded (%d occurrences, max %d allowed in %s)",
-			violations[0].Count,
+			violations[0],
 			maxOccurrences,
 			p.config.Window,
 		),
@@ -157,8 +157,6 @@ func (p *Plugin) Evaluate(ctx context.Context, msg plugin.Message) (plugin.Resul
 	}, nil
 }
 
-// Cleanup performs maintenance tasks for the plugin.
-// Should be called periodically to clean up expired entries.
-func (p *Plugin) Cleanup(_ context.Context) {
-	p.storage.Cleanup()
+// Cleanup is a no-op: expired counters are reclaimed by the cachefx sweeper.
+func (p *Plugin) Cleanup(context.Context) {
 }

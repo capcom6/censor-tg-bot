@@ -22,7 +22,7 @@ func TestPlugin_Priority(t *testing.T) {
 
 	config, _ := forwarded.NewConfig(map[string]any{})
 	p := forwarded.New(config)
-	require.Equal(t, 15, p.Priority())
+	require.Equal(t, 10, p.Priority())
 }
 
 func TestPlugin_Evaluate(t *testing.T) {

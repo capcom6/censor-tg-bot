@@ -18,6 +18,9 @@ type ExecutionStrategy string
 const (
 	pluginName = "manager"
 
+	// cleanupInterval is how often Run lets plugins reclaim expired entries.
+	cleanupInterval = time.Minute
+
 	StrategySequential ExecutionStrategy = "sequential" // execute plugins in priority order, Allow takes precedence over Block
 	StrategyParallel   ExecutionStrategy = "parallel"   // execute all plugins concurrently, aggregate results
 )
@@ -156,6 +159,23 @@ func (s *Service) Evaluate(ctx context.Context, msg plugin.Message) plugin.Resul
 	return result
 }
 
+// Run performs periodic plugin cleanup until ctx is canceled. It runs as a
+// background runnable registered through [fxutil.RegisterRunnable].
+func (s *Service) Run(ctx context.Context) error {
+	ticker := time.NewTicker(cleanupInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			s.Cleanup(ctx)
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
+// Cleanup lets every plugin reclaim expired entries.
 func (s *Service) Cleanup(ctx context.Context) {
 	s.mu.RLock()
 	plugins := make([]plugin.Plugin, len(s.plugins))

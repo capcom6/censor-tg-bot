@@ -15,6 +15,7 @@ import (
 	openai "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 	"github.com/openai/openai-go/v3/packages/param"
+	"go.uber.org/zap"
 )
 
 const (
@@ -32,22 +33,35 @@ type Response struct {
 	Reason        string  `json:"reason"        description:"Reason for the response"              required:"true"`
 }
 
-type Cache interface {
-	SetBy(text, model, prompt, mediaHash string, resp *Response)
-	GetBy(text, model, prompt, mediaHash string) (*Response, bool)
-	Cleanup()
+// Marshal implements [cache.Item] so responses can be cached.
+func (r *Response) Marshal() ([]byte, error) {
+	data, err := json.Marshal(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal response: %w", err)
+	}
+
+	return data, nil
+}
+
+// Unmarshal implements [cache.Item] so responses can be cached.
+func (r *Response) Unmarshal(data []byte) error {
+	if err := json.Unmarshal(data, r); err != nil {
+		return fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return nil
 }
 
 func Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name: "llm",
-		Factory: func(params map[string]any) (plugin.Plugin, error) {
+		Factory: func(params map[string]any, deps plugin.Deps) (plugin.Plugin, error) {
 			config, err := NewConfig(params)
 			if err != nil {
 				return nil, err
 			}
 
-			return New(config)
+			return New(config, deps)
 		},
 	}
 }
@@ -56,10 +70,15 @@ type Plugin struct {
 	config         Config
 	client         openai.Client
 	responseSchema map[string]any
-	cache          Cache
+	baseURL        string
+	cache          *Storage
+	logger         *zap.Logger
 }
 
-func New(config Config) (plugin.Plugin, error) {
+// New creates the plugin from a validated configuration and shared deps.
+//
+// deps.Cache is guaranteed by the wiring (one app-scoped cache per plugin name).
+func New(config Config, deps plugin.Deps) (plugin.Plugin, error) {
 	reflector := jsonschema.Reflector{
 		AllowAdditionalProperties: false,
 		DoNotReference:            true,
@@ -91,7 +110,9 @@ func New(config Config) (plugin.Plugin, error) {
 		config:         config,
 		client:         client,
 		responseSchema: responseSchema,
-		cache:          NewStorage(config.CacheTTL, config.CacheMaxSize),
+		baseURL:        baseURL,
+		cache:          NewStorage(deps.Cache, config.CacheTTL),
+		logger:         deps.Logger,
 	}, nil
 }
 
@@ -104,7 +125,7 @@ func (p *Plugin) Capabilities() plugin.Capability {
 }
 
 func (p *Plugin) Priority() int {
-	const priority = 250
+	const priority = 260
 	return priority
 }
 
@@ -135,9 +156,17 @@ func (p *Plugin) Evaluate(ctx context.Context, msg plugin.Message) (plugin.Resul
 	// different image is a different request.
 	mediaHash := mediaDigest(media)
 
-	// Check cache first
+	// Check cache first; a cache failure degrades to a miss and is logged,
+	// never fails the evaluation.
 	if p.config.CacheEnabled {
-		if cachedResp, found := p.cache.GetBy(text, p.config.Model, p.config.Prompt, mediaHash); found {
+		cachedResp, found, cacheErr := p.cache.GetBy(
+			ctx, text, p.config.Model, p.config.Prompt, mediaHash, p.baseURL, p.config.Temperature,
+		)
+		if cacheErr != nil {
+			p.logger.Warn("failed to read llm cache", zap.Error(cacheErr))
+		}
+
+		if found {
 			result := p.evaluateResponse(cachedResp)
 			result.Metadata["cached"] = true
 			return result, nil
@@ -152,7 +181,12 @@ func (p *Plugin) Evaluate(ctx context.Context, msg plugin.Message) (plugin.Resul
 
 	// Store in cache
 	if p.config.CacheEnabled {
-		p.cache.SetBy(text, p.config.Model, p.config.Prompt, mediaHash, llmResponse)
+		cacheErr := p.cache.SetBy(
+			ctx, text, p.config.Model, p.config.Prompt, mediaHash, p.baseURL, p.config.Temperature, llmResponse,
+		)
+		if cacheErr != nil {
+			p.logger.Warn("failed to write llm cache", zap.Error(cacheErr))
+		}
 	}
 
 	result := p.evaluateResponse(llmResponse)
@@ -280,6 +314,7 @@ func mediaDigest(media *plugin.Media) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (p *Plugin) Cleanup(_ context.Context) {
-	p.cache.Cleanup()
+// Cleanup is a no-op: expired cache entries are reclaimed by the cachefx
+// sweeper and evicted lazily on Get.
+func (p *Plugin) Cleanup(context.Context) {
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/capcom6/censor-tg-bot/internal/censor"
 	plug "github.com/capcom6/censor-tg-bot/internal/censor/plugin"
 	"github.com/go-core-fx/config"
+	"github.com/samber/lo"
 )
 
 type Bot struct {
@@ -48,7 +49,12 @@ type Censor struct {
 }
 
 type Storage struct {
-	URL string `koanf:"url"`
+	TTL time.Duration `koanf:"ttl"`
+}
+
+type cacheConfig struct {
+	URL           string        `koanf:"url"`
+	SweepInterval time.Duration `koanf:"sweep_interval"`
 }
 
 type http struct {
@@ -58,11 +64,12 @@ type http struct {
 }
 
 type Config struct {
-	Bot      Bot      `koanf:"bot"`
-	Telegram telegram `koanf:"telegram"`
-	Censor   Censor   `koanf:"censor"`
-	Storage  Storage  `koanf:"storage"`
-	HTTP     http     `koanf:"http"`
+	Bot      Bot         `koanf:"bot"`
+	Telegram telegram    `koanf:"telegram"`
+	Censor   Censor      `koanf:"censor"`
+	Storage  Storage     `koanf:"storage"`
+	Cache    cacheConfig `koanf:"cache"`
+	HTTP     http        `koanf:"http"`
 }
 
 func Default() Config {
@@ -90,7 +97,9 @@ func Default() Config {
 					Enabled:  true,
 					Priority: 10,
 					Config: map[string]any{
-						"blacklist": []string{"$", "долл"},
+						// The plugin config parser expects the YAML-decoded
+						// []any shape, not the struct-typed []string.
+						"blacklist": lo.ToAnySlice([]string{"$", "долл"}),
 					},
 				},
 			},
@@ -98,7 +107,11 @@ func Default() Config {
 			SkipAction:  plug.ActionAllow,
 		},
 		Storage: Storage{
-			URL: "memory://storage?ttl=5m",
+			TTL: 5 * time.Minute,
+		},
+		Cache: cacheConfig{
+			URL:           "memory://?max_entries=1000",
+			SweepInterval: time.Minute,
 		},
 		HTTP: http{
 			Address:     "127.0.0.1:3000",

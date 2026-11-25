@@ -92,5 +92,3 @@ censor:
         cache_enabled: true # default: true
         # Time to live for cached responses (supported formats: "30s", "5m", "1h")
         cache_ttl: "1h" # default: "1h"
-        # Maximum number of responses to cache
-        cache_max_size: 1000 # default: 1000
