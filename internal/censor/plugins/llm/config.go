@@ -21,8 +21,6 @@ const (
 
 	// DefaultCacheTTL is the default TTL for cached responses.
 	DefaultCacheTTL = 1 * time.Hour
-	// DefaultCacheMaxSize is the default maximum size of the cache.
-	DefaultCacheMaxSize = 1000
 	// MinCacheTTL is the minimum TTL for cached responses.
 	MinCacheTTL = 1 * time.Minute
 	// MaxCacheTTL is the maximum TTL for cached responses.
@@ -52,7 +50,6 @@ type Config struct {
 	Prompt              string        // Custom prompt for the LLM
 	Temperature         float64       // Temperature for the LLM
 	CacheTTL            time.Duration // TTL for cached responses
-	CacheMaxSize        int           // Maximum number of cached responses
 	CacheEnabled        bool          // Whether caching is enabled
 }
 
@@ -115,11 +112,6 @@ func NewConfig(config map[string]any) (Config, error) {
 		return Config{}, fmt.Errorf("%w: failed to parse cache_ttl: %w", plugin.ErrInvalidConfig, err)
 	}
 
-	// Parse CacheMaxSize
-	if c.CacheMaxSize, err = plugin.ConfigValue(config, "cache_max_size", c.CacheMaxSize); err != nil {
-		return Config{}, err //nolint:wrapcheck // no need
-	}
-
 	// Parse CacheEnabled
 	if c.CacheEnabled, err = plugin.ConfigValue(config, "cache_enabled", c.CacheEnabled); err != nil {
 		return Config{}, err //nolint:wrapcheck // no need
@@ -144,7 +136,6 @@ func DefaultConfig() Config {
 		Prompt:              "Analyze the following message for inappropriate content, spam, or violations. Respond with JSON: {\"inappropriate\": boolean, \"confidence\": float, \"reason\": string}",
 		Temperature:         DefaultTemperature,
 		CacheTTL:            DefaultCacheTTL,
-		CacheMaxSize:        DefaultCacheMaxSize,
 		CacheEnabled:        true,
 	}
 }
@@ -208,15 +199,6 @@ func (c Config) Validate() error {
 			MinCacheTTL,
 			MaxCacheTTL,
 			c.CacheTTL,
-		)
-	}
-
-	// Check CacheMaxSize
-	if c.CacheEnabled && c.CacheMaxSize <= 0 {
-		return fmt.Errorf(
-			"%w: cache_max_size must be positive, got: %d",
-			plugin.ErrInvalidConfig,
-			c.CacheMaxSize,
 		)
 	}
 

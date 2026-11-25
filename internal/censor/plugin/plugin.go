@@ -1,6 +1,11 @@
 package plugin
 
-import "context"
+import (
+	"context"
+
+	"github.com/go-core-fx/cachefx/cache"
+	"go.uber.org/zap"
+)
 
 // Result represents the decision made by a plugin.
 type Result struct {
@@ -37,10 +42,21 @@ type Message struct {
 	Media *Media // Downloaded media content
 }
 
+// Deps are shared dependencies the app wiring provides to every plugin.
+//
+// Cache is the app-scoped cache named after the plugin, created for every
+// plugin at startup; creation failure fails startup, so plugins can use it
+// without a nil check. Logger is always provided.
+type Deps struct {
+	Cache  cache.Cache
+	Logger *zap.Logger
+}
+
 // Metadata contains information about a plugin.
 type Metadata struct {
-	Name    string                                      // Plugin name
-	Factory func(params map[string]any) (Plugin, error) // Factory function
+	Name string
+	// Factory creates the plugin from its config block and shared deps.
+	Factory func(params map[string]any, deps Deps) (Plugin, error)
 }
 
 // Plugin is the interface that all censor plugins must implement.

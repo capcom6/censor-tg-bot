@@ -108,12 +108,12 @@ func (b *Bot) processMessage(ctx context.Context, bot *tgbotapifx.Bot, message *
 	}
 	b.metrics.IncProcessedAction(MetricLabelActionAdminNotified, MetricLabelStatusSuccess)
 
-	cnt, err := b.storage.GetOrSet(strconv.FormatInt(message.From.ID, 10))
+	cnt, err := b.storage.Increment(ctx, strconv.FormatInt(message.From.ID, 10))
 	if err != nil {
 		b.logger.Warn("error getting violation count", zap.Any("message", message), zap.Error(err))
 	}
-	b.logger.Info("violation count", zap.Any("message", message), zap.Int("count", cnt))
-	if cnt < int(b.config.BanThreshold) {
+	b.logger.Info("violation count", zap.Any("message", message), zap.Int64("count", cnt))
+	if cnt < int64(b.config.BanThreshold) {
 		return nil
 	}
 

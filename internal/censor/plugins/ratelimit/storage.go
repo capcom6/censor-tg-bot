@@ -1,59 +1,35 @@
 package ratelimit
 
 import (
-	"sync"
+	"context"
+	"fmt"
+	"strconv"
 	"time"
+
+	"github.com/go-core-fx/cachefx/cache"
 )
 
-// Storage implements a simple in-memory rate limiter.
+// Storage implements rate limiting as atomic counters in the app cache.
+//
+// Each user gets one counter per fixed window: the counter is created with
+// the window as its TTL and incremented while it lives, so the next message
+// after expiry restarts the window. Idle counters are reclaimed by the
+// cachefx sweeper.
 type Storage struct {
-	entries map[int64]*Entry
-	mu      sync.Mutex
+	cache cache.Cache
 }
 
-type Entry struct {
-	Count   int
-	ResetAt time.Time
+// NewStorage creates a Storage over the injected app cache.
+func NewStorage(c cache.Cache) *Storage {
+	return &Storage{cache: c}
 }
 
-func NewStorage() *Storage {
-	return &Storage{
-		entries: make(map[int64]*Entry),
-		mu:      sync.Mutex{},
-	}
-}
-
-func (s *Storage) IncrementAndGet(userID int64, window time.Duration) (int, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	now := time.Now()
-	entry, exists := s.entries[userID]
-
-	if !exists || now.After(entry.ResetAt) {
-		// Create new entry or reset expired entry
-		entry = &Entry{
-			Count:   1,
-			ResetAt: now.Add(window),
-		}
-		s.entries[userID] = entry
-		return entry.Count, nil
+// IncrementAndGet increments the user's window counter and returns the new value.
+func (s *Storage) IncrementAndGet(ctx context.Context, userID int64, window time.Duration) (int64, error) {
+	count, err := s.cache.Increment(ctx, strconv.FormatInt(userID, 10), 1, cache.WithTTL(window))
+	if err != nil {
+		return 0, fmt.Errorf("failed to increment rate limit counter: %w", err)
 	}
 
-	// Increment existing entry
-	entry.Count++
-	return entry.Count, nil
-}
-
-// Cleanup removes expired entries to prevent memory leaks.
-func (s *Storage) Cleanup() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	now := time.Now()
-	for userID, entry := range s.entries {
-		if now.After(entry.ResetAt) {
-			delete(s.entries, userID)
-		}
-	}
+	return count, nil
 }

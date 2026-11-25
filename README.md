@@ -163,12 +163,14 @@ The application loads configuration from environment variables (via `.env` file)
 | `CENSOR__SKIP_ACTION`   | No       | `allow`                   | Default action when all plugins skip (`block` or `allow`)                                                   |
 | `CENSOR__STRATEGY`      | No       | `sequential`              | Execution strategy (`sequential` or `parallel`)                                                             |
 | `CENSOR__TIMEOUT`       | No       | `30s`                     | Time budget for evaluating one message across all plugins                                                   |
+| `CACHE__SWEEP_INTERVAL` | No       | `1m`                      | How often the cachefx sweeper evicts expired cache entries                                                  |
+| `CACHE__URL`            | No       | `memory://?max_entries=1000` | App-wide cache backend shared by plugins (`memory://[?max_entries=N]` or `redis://...`; LRU cap applies per cache) |
 | `CONFIG_PATH`           | No       | —                         | Path to YAML configuration file                                                                             |
 | `DEBUG`                 | No       | `false`                   | Enable debug logging and Telegram API request logging (`true`)                                              |
 | `HTTP__ADDRESS`         | No       | `127.0.0.1:3000`          | Metrics endpoint address                                                                                    |
 | `HTTP__PROXIES`         | No       | —                         | Trusted proxy IPs — a single IP or a JSON array (e.g. `["127.0.0.1"]`); comma-separated lists are not split |
 | `HTTP__PROXY_HEADER`    | No       | `X-Forwarded-For`         | Proxy header for trusted proxies                                                                            |
-| `STORAGE__URL`          | No       | `memory://storage?ttl=5m` | Storage backend URL (`memory://` only, with TTL)                                                            |
+| `STORAGE__TTL`          | No       | `5m`                      | Sliding idle-window for user violation counters (ban threshold)                                              |
 | `TELEGRAM__PROXY_URL`   | No       | —                         | SOCKS5 proxy URL                                                                                            |
 | `TELEGRAM__TIMEOUT`     | No       | `60s`                     | Timeout for Telegram API requests (raised to a `70s` minimum)                                               |
 
@@ -208,7 +210,7 @@ censor:
   plugins:
     keyword:
       enabled: true
-      priority: 10
+      priority: 20
       config:
         blacklist:
           - spam
@@ -217,14 +219,14 @@ censor:
 
     ratelimit:
       enabled: true
-      priority: 5
+      priority: 15
       config:
         max_messages: 5
         window: "1m"
 
     regex:
       enabled: false
-      priority: 20
+      priority: 25
       config:
         patterns:
           - 'https?://[\w\-\.]+\.xyz'
@@ -232,7 +234,7 @@ censor:
 
     forwarded:
       enabled: false
-      priority: 15
+      priority: 10
       config:
         allowed_user_ids:
           - 123456789
@@ -255,7 +257,7 @@ censor:
 
     llm:
       enabled: false
-      priority: 250
+      priority: 260
       config:
         api_key: "<your-api-key>"
         model: "nvidia/nemotron-3.5-super-vl:free"
@@ -347,7 +349,7 @@ Blocks or allows messages based on user IDs. Whitelisted users are always allowe
 
 #### LLM Plugin
 
-Blocks messages containing potentially inappropriate content, spam, or violations by analyzing the message with an external LLM API. Supports response caching (LRU eviction) to reduce API costs.
+Blocks messages containing potentially inappropriate content, spam, or violations by analyzing the message with an external LLM API. Supports response caching (TTL-bound, app-wide cache backend) to reduce API costs.
 
 Photos are sent to the model as an image next to the caption, so a picture is evaluated even when it carries no text. The cache key contains the digest of the photo, so the same caption with a different image is a new request.
 

@@ -16,7 +16,7 @@ const (
 func Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name: pluginName,
-		Factory: func(params map[string]any) (plugin.Plugin, error) {
+		Factory: func(params map[string]any, _ plugin.Deps) (plugin.Plugin, error) {
 			config, err := NewConfig(params)
 			if err != nil {
 				return nil, err
@@ -53,8 +53,8 @@ func (p *Plugin) Capabilities() plugin.Capability {
 }
 
 func (p *Plugin) Priority() int {
-	const priority = 10
-	return priority // Low priority = early execution
+	const priority = 20
+	return priority // Early execution; in-memory text scan
 }
 
 func (p *Plugin) Evaluate(_ context.Context, msg plugin.Message) (plugin.Result, error) {
